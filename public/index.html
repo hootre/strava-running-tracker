@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#FC4C02">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <meta name="apple-mobile-web-app-title" content="SM러닝크루">
+  <title>SM러닝크루</title>
+  <script>
+    (function() {
+      var ua = navigator.userAgent || '';
+      var isInApp = /KAKAOTALK|NAVER|FB_IAB|Instagram|Line|DaumApps|SamsungBrowser\/.*CrossApp/i.test(ua);
+      if (isInApp) {
+        if (/android/i.test(ua)) {
+          location.href = 'intent://' + location.href.replace(/https?:\/\//, '') +
+            '#Intent;scheme=https;package=com.android.chrome;end';
+        }
+      }
+    })();
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --primary: #FC4C02;
+      --primary-dark: #E34402;
+      --success: #22C55E;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --bg: #0F172A;
+      --bg-card: #1E293B;
+      --bg-hover: #334155;
+      --text: #F1F5F9;
+      --text-muted: #94A3B8;
+      --border: #334155;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding-bottom: calc(64px + var(--safe-bottom));
+      overflow-x: hidden;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, #E34402 100%);
+      padding: 16px 16px 14px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 18px; font-weight: 800; }
+    .header-actions { display: flex; gap: 8px; }
+
+    .btn {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-white { background: white; color: var(--primary); }
+    .btn-outline {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    /* ─── Stats ─── */
+    .stats-scroll {
+      display: flex;
+      gap: 10px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .stats-scroll::-webkit-scrollbar { display: none; }
+
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      min-width: 130px;
+      flex-shrink: 0;
+    }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+    .stat-value { font-size: 22px; font-weight: 800; }
+    .stat-value.danger { color: var(--danger); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.primary { color: var(--primary); }
+
+    /* ─── Bottom Tab Bar ─── */
+    .tab-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      display: flex; z-index: 100;
+      padding-bottom: var(--safe-bottom);
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 10px 0 8px; border: none; background: none;
+      color: var(--text-muted); font-size: 10px; font-weight: 600;
+      cursor: pointer; transition: color 0.15s; gap: 4px;
+    }
+    .tab-item.active { color: var(--primary); }
+    .tab-icon { font-size: 20px; line-height: 1; }
+
+    /* ─── Content ─── */
+    .container { padding: 0 0 16px; }
+
+    /* ─── Member Card ─── */
+    .member-list { padding: 0 12px; display: flex; flex-direction: column; gap: 12px; }
+
+    .member-card {
+      background: var(--bg-card);
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .member-header {
+      padding: 14px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .member-name {
+      font-size: 15px; font-weight: 700;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .member-rank {
+      font-size: 11px; font-weight: 800;
+      color: var(--text-muted);
+      background: var(--bg-hover);
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .member-rank.rank-1 { background: #F59E0B; color: #0F172A; }
+    .member-rank.rank-2 { background: #94A3B8; color: #0F172A; }
+    .member-rank.rank-3 { background: #CD7C41; color: #0F172A; }
+    .member-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      object-fit: cover; border: 2px solid var(--border);
+      background: var(--bg-hover);
+    }
+    .member-status {
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+    }
+
+    /* ─── 요약 행 ─── */
+    .member-summary {
+      padding: 10px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; border-top: 1px solid var(--border);
+    }
+    .member-summary:active { background: var(--bg-hover); }
+    .summary-left { display: flex; align-items: center; gap: 12px; }
+
+    /* ─── 원형 프로그레스 링 (수정: overflow 방지) ─── */
+    .summary-progress-ring {
+      width: 52px; height: 52px;
+      position: relative; flex-shrink: 0;
+    }
+    .summary-progress-ring svg { transform: rotate(-90deg); }
+    .ring-text {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 1px;
+    }
+    .ring-km { font-size: 10px; font-weight: 800; line-height: 1; }
+    .ring-unit { font-size: 7px; font-weight: 600; color: var(--text-muted); line-height: 1; }
+
+    .summary-info {}
+    .summary-week { font-size: 13px; font-weight: 600; }
+    .summary-month { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .summary-penalty { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .summary-chevron { font-size: 14px; color: var(--text-muted); transition: transform 0.25s; }
+    .member-card.open .summary-chevron { transform: rotate(180deg); }
+
+    /* ─── 펼침 영역 ─── */
+    .member-detail { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .member-card.open .member-detail { max-height: 520px; }
+    .member-detail-inner { padding: 0 16px 14px; }
+
+    .status-pass { background: rgba(34,197,94,0.15); color: var(--success); }
+    .status-fail { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .status-ongoing { background: rgba(245,158,11,0.15); color: var(--warning); }
+
+    /* ─── 미니 달력 ─── */
+    .mini-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .mini-cal-header {
+      text-align: center; font-size: 10px; color: var(--text-muted);
+      padding: 2px 0 4px; font-weight: 600;
+    }
+    .mini-cal-day {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      border-radius: 8px; font-size: 11px; color: var(--text-muted);
+    }
+    .mini-cal-day.today { border: 2px solid var(--primary); color: var(--text); font-weight: 700; }
+    .mini-cal-day.has-run { background: rgba(34,197,94,0.25); color: var(--success); font-weight: 700; }
+    .mini-cal-day.has-run-long {
+      background: rgba(96,165,250,0.25); color: #60A5FA; font-weight: 800;
+      box-shadow: inset 0 0 0 1.5px rgba(96,165,250,0.4);
+    }
+    .mini-cal-day.has-run-short { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .mini-cal-day.empty { visibility: hidden; }
+
+    .calendar-legend { display: flex; gap: 12px; margin-top: 10px; justify-content: center; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text-muted); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 3px; }
+
+    /* ─── 월 네비게이션 ─── */
+    .month-nav {
+      display: flex; align-items: center; justify-content: center;
+      gap: 20px; padding: 14px 16px;
+    }
+    .month-nav button {
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+      width: 40px; height: 40px; border-radius: 10px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .month-nav button:active { background: var(--bg-hover); }
+    .month-title { font-size: 18px; font-weight: 700; min-width: 120px; text-align: center; }
+
+    /* ─── 벌금 테이블 ─── */
+    .penalty-section {
+      margin: 0 12px 16px; background: var(--bg-card);
+      border-radius: 14px; border: 1px solid var(--border); overflow: hidden;
+    }
+    .penalty-header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .penalty-header h2 { font-size: 16px; font-weight: 700; }
+
+    .penalty-summary { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .penalty-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px; background: var(--bg); border-radius: 10px;
+    }
+    .penalty-row-left { display: flex; align-items: center; gap: 8px; }
+    .penalty-row-name { font-weight: 600; font-size: 14px; }
+    .penalty-row-info { text-align: right; }
+    .penalty-row-weeks { font-size: 11px; color: var(--text-muted); }
+    .penalty-row-amount { font-size: 16px; font-weight: 800; }
+
+    .week-detail-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .week-detail-scroll::-webkit-scrollbar { display: none; }
+
+    table { width: 100%; border-collapse: collapse; min-width: 400px; }
+    th {
+      text-align: center; padding: 10px 12px; font-size: 12px;
+      font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.15); position: sticky; top: 0;
+    }
+    th:first-child { text-align: left; position: sticky; left: 0; z-index: 1; background: var(--bg-card); }
+    td {
+      padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border);
+      text-align: center; white-space: nowrap;
+    }
+    td:first-child { text-align: left; position: sticky; left: 0; background: var(--bg-card); z-index: 1; font-weight: 600; font-size: 12px; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ─── Empty State ─── */
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+    .empty-state p { margin-bottom: 20px; font-size: 14px; line-height: 1.5; }
+
+    /* ─── 데스크톱 반응형 ─── */
+    @media (min-width: 768px) {
+      body { padding-bottom: 0; }
+      .header { padding: 18px 32px; }
+      .header-top { max-width: 1200px; margin: 0 auto; }
+      .header h1 { font-size: 22px; }
+      .tab-bar {
+        position: static; background: var(--bg); border-top: none;
+        border-bottom: 1px solid var(--border);
+        max-width: 1200px; margin: 0 auto; padding: 0 32px;
+        gap: 4px; justify-content: flex-start;
+      }
+      .tab-item {
+        flex: none; flex-direction: row; padding: 14px 20px; font-size: 14px;
+        gap: 8px; border-bottom: 3px solid transparent; border-radius: 0;
+      }
+      .tab-item.active { border-bottom-color: var(--primary); color: var(--primary); }
+      .tab-icon { font-size: 16px; }
+      .stats-scroll { max-width: 1200px; margin: 0 auto; padding: 20px 32px; gap: 16px; }
+      .stat-card { min-width: 0; flex: 1; padding: 20px 24px; }
+      .stat-label { font-size: 13px; }
+      .stat-value { font-size: 28px; }
+      .container { max-width: 1200px; margin: 0 auto; padding: 0 32px 32px; }
+      .member-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 0; }
+      .member-card { border-radius: 16px; }
+      .member-card.open .member-detail { max-height: 600px; }
+      .month-nav { padding: 20px 0; }
+      .month-title { font-size: 22px; }
+      .penalty-section { margin: 0 0 20px; border-radius: 16px; }
+      .penalty-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      table { min-width: auto; }
+      .modal-overlay { align-items: center; }
+      .modal-sheet { border-radius: 20px; max-width: 520px; max-height: 80vh; margin: 0 20px; }
+    }
+
+    @media (min-width: 1024px) {
+      .member-list { grid-template-columns: repeat(3, 1fr); }
+      .penalty-summary { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    /* ─── Spinner ─── */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Toast ─── */
+    .toast {
+      position: fixed; bottom: calc(72px + var(--safe-bottom));
+      left: 12px; right: 12px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; font-size: 14px; z-index: 200;
+      transform: translateY(100px); opacity: 0; transition: all 0.3s; text-align: center;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--danger); }
+    .toast.warn { border-color: var(--warning); }
+
+    /* ─── 기록 상세 모달 ─── */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); z-index: 300;
+      align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-sheet {
+      background: var(--bg-card); border-radius: 20px 20px 0 0;
+      width: 100%; max-width: 480px; max-height: 70vh;
+      overflow-y: auto; padding: 20px 16px calc(20px + var(--safe-bottom));
+      animation: slideUp 0.25s ease-out;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+    .run-card { background: var(--bg); border-radius: 14px; padding: 16px; margin-bottom: 10px; }
+    .run-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .run-card-name { font-size: 15px; font-weight: 700; }
+    .run-card-member { font-size: 12px; color: var(--text-muted); }
+    .run-card-stats { display: flex; gap: 16px; }
+    .run-stat { text-align: center; }
+    .run-stat-value { font-size: 18px; font-weight: 800; color: var(--primary); }
+    .run-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .run-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+    .badge-long { background: rgba(96,165,250,0.2); color: #60A5FA; }
+    .badge-ok { background: rgba(34,197,94,0.2); color: #22C55E; }
+    .badge-short { background: rgba(245,158,11,0.2); color: #F59E0B; }
+    .modal-empty { text-align: center; color: var(--text-muted); padding: 32px 0; font-size: 14px; }
+
+    /* ─── 마감 임박 배너 ─── */
+    #deadline-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: linear-gradient(135deg, #EF4444, #DC2626);
+      color: white; padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      animation: slideDown 0.3s ease;
+      box-shadow: 0 4px 12px rgba(239,68,68,0.4);
+    }
+    @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+    /* ─── 챌린지 정보 서브헤더 ─── */
+    .challenge-bar {
+      background: rgba(0,0,0,0.2);
+      padding: 6px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; color: rgba(255,255,255,0.8);
+    }
+    .challenge-bar strong { color: white; }
+
+    /* ─── 월간 순위 뱃지 ─── */
+    .monthly-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(252,76,2,0.15); color: var(--primary);
+      padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <h1>&#x1F3C3; SM러닝크루</h1>
+      <div class="header-actions">
+        <button class="btn btn-outline" onclick="syncData()" id="syncBtn">&#x1F504; 동기화</button>
+        <button class="btn btn-outline" id="notifyBtn" onclick="toggleNotification()" style="display:none;font-size:12px;padding:6px 10px;" title="마감 임박 알림">&#x1F514;</button>
+        <button class="btn btn-outline" id="logoutBtn" onclick="logout()" style="display:none;font-size:12px;padding:6px 10px;">로그아웃</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 챌린지 정보 바 -->
+  <div class="challenge-bar" id="challengeBar" style="display:none">
+    <span id="challengeNameSpan"></span>
+    <span id="challengePeriodSpan"></span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-scroll" id="statsBar"></div>
+
+  <!-- Content -->
+  <div class="container" id="content"></div>
+
+  <!-- Bottom Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-item active" onclick="switchTab('dashboard')" data-tab="dashboard">
+      <span class="tab-icon">&#x1F3E0;</span>
+      <span>대시보드</span>
+    </button>
+    <button class="tab-item" onclick="switchTab('calendar')" data-tab="calendar">
+      <span class="tab-icon">&#x1F4C5;</span>
+      <span>달력</span>
+    </button>
+    <button class="tab-item" onclick="switchTab('penalties')" data-tab="penalties">
+      <span class="tab-icon">&#x1F4B0;</span>
+      <span>벌금</span>
+    </button>
+  </div>
+
+  <!-- 기록 상세 모달 -->
+  <div class="modal-overlay" id="runModal" onclick="closeModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let dashboardData = null;
+    let currentTab = 'dashboard';
+    let calendarDate = new Date();
+    let autoRefreshTimer = null;
+
+    // ── 주간 계산 (동적 설정 기반) ──
+    function getCurrentWeekStart(date) {
+      const settings = dashboardData?.settings || {};
+      const cStart = settings.challengeStart || '2026-04-19';
+      const fEnd   = settings.firstWeekEnd   || '2026-04-26';
+      const d = new Date(date);
+      const dateStr = d.toISOString().split('T')[0];
+      if (dateStr >= cStart && dateStr <= fEnd) return cStart;
+      const day = d.getDay();
+      const diff = day === 0 ? 6 : day - 1;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - diff);
+      return monday.toISOString().split('T')[0];
+    }
+
+    // ── 이번 달 km 계산 ──
+    function getMonthlyKm(member) {
+      // 서버에서 이미 계산해서 내려줌
+      return member.monthlyKm || 0;
+    }
+
+    // ── PWA 서비스워커 ──
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    // ── 로그인 유지 ──
+    function getMyInfo() {
+      try { const s = localStorage.getItem('bora_runner'); return s ? JSON.parse(s) : null; }
+      catch(e) { return null; }
+    }
+    function saveMyInfo(sid, name) {
+      localStorage.setItem('bora_runner', JSON.stringify({ sid, name, ts: Date.now() }));
+    }
+    function clearMyInfo() { localStorage.removeItem('bora_runner'); }
+
+    function logout() {
+      clearMyInfo();
+      updateLoginUI();
+      showToast('로그아웃 되었습니다');
+    }
+
+    function updateLoginUI() {
+      const me = getMyInfo();
+      const loggedIn = !!(me && me.sid);
+      document.getElementById('logoutBtn').style.display = loggedIn ? 'inline-block' : 'none';
+      // 알림 버튼: 로그인 + VAPID 설정된 경우만 표시
+      const vapidOk = dashboardData?.settings?.vapidConfigured;
+      const notifyBtn = document.getElementById('notifyBtn');
+      if (notifyBtn) notifyBtn.style.display = (loggedIn && vapidOk) ? 'inline-block' : 'none';
+      updateNotifyBtnState();
+    }
+
+    async function updateNotifyBtnState() {
+      const btn = document.getElementById('notifyBtn');
+      if (!btn || btn.style.display === 'none') return;
+      if (!('Notification' in window) || !('PushManager' in window)) {
+        btn.style.display = 'none'; return;
+      }
+      if (Notification.permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready.catch(() => null);
+        if (reg) {
+          const sub = await reg.pushManager.getSubscription().catch(() => null);
+          btn.title = sub ? '알림 해제' : '알림 받기';
+          btn.innerHTML = sub ? '&#x1F515;' : '&#x1F514;';
+          btn.style.background = sub ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.15)';
+        }
+      }
+    }
+
+    // ── Init ──
+    async function init() {
+      updateLoginUI();
+
+      const hash = window.location.hash;
+      if (hash.includes('connected')) {
+        const sid = hash.match(/sid=(\d+)/)?.[1];
+        const name = hash.match(/name=([^&]+)/)?.[1];
+        if (sid) saveMyInfo(sid, decodeURIComponent(name || ''));
+        updateLoginUI();
+        showToast('연결 완료! 기록을 불러왔습니다', 'success');
+        history.replaceState(null, '', '/');
+      }
+
+      await fetchDashboard();
+      render();
+      renderChallengeBar();
+      updateLoginUI();        // VAPID 상태 반영
+      checkDeadlineBanner();  // 마감 임박 배너
+
+      // 5분마다 자동 새로고침
+      autoRefreshTimer = setInterval(async () => {
+        await fetchDashboard();
+        render();
+        renderChallengeBar();
+        checkDeadlineBanner();
+      }, 5 * 60 * 1000);
+    }
+
+    async function fetchDashboard() {
+      try {
+        const res = await fetch('/api/dashboard');
+        dashboardData = await res.json();
+      } catch (e) { console.error('Dashboard fetch error:', e); }
+    }
+
+    async function syncData() {
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> 동기화중';
+      try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+        await fetchDashboard();
+        render();
+
+        const { summary } = data;
+        if (!summary) {
+          showToast('동기화 완료');
+          return;
+        }
+        if (summary.ok > 0 && summary.errors === 0) {
+          showToast(`${summary.ok}명 동기화 완료!`, 'success');
+        } else if (summary.ok > 0 && summary.errors > 0) {
+          showToast(`${summary.ok}명 완료, ${summary.errors}명 오류`, 'warn');
+        } else if (summary.noToken === summary.total) {
+          showToast('연결된 멤버가 없습니다. 관리자 페이지에서 등록해주세요');
+        } else if (summary.errors > 0) {
+          const errMsg = data.results.filter(r => r.status === 'error' || r.status === 'token_error').map(r => r.message).filter(Boolean)[0];
+          showToast(errMsg || `동기화 오류 ${summary.errors}건`, 'error');
+        } else {
+          showToast('동기화할 멤버가 없습니다');
+        }
+      } catch (e) {
+        showToast('동기화 실패 - 서버 연결을 확인해주세요', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '&#x1F504; 동기화';
+      }
+    }
+
+    // ── Render ──
+    function render() { renderStats(); renderContent(); }
+
+    function renderStats() {
+      if (!dashboardData) return;
+      const { members, settings } = dashboardData;
+      const total = members.length;
+      const connected = members.filter(m => m.connected).length;
+      const totalPenalty = members.reduce((s, m) => s + m.totalPenalty, 0);
+
+      const now = new Date();
+      const ws = getCurrentWeekStart(now);
+      const passed = members.filter(m => m.penalties.some(p => p.week_start === ws && p.passed)).length;
+
+      // 이번 달 전체 크루 총 km
+      const totalMonthlyKm = members.reduce((s, m) => s + (m.monthlyKm || 0), 0);
+
+      document.getElementById('statsBar').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">참가자</div>
+          <div class="stat-value">${connected}/${total}명</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">이번 주 통과</div>
+          <div class="stat-value success">${passed}명</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">이번 달 크루 총</div>
+          <div class="stat-value primary">${Math.round(totalMonthlyKm * 10) / 10}km</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">누적 벌금</div>
+          <div class="stat-value danger">${(totalPenalty/10000).toFixed(0)}만원</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">조건</div>
+          <div class="stat-value" style="font-size:14px;line-height:1.6">주<br>${settings.requiredKm}km</div>
+        </div>
+      `;
+    }
+
+    function renderContent() {
+      switch(currentTab) {
+        case 'dashboard': renderDashboard(); break;
+        case 'calendar': renderCalendar(); break;
+        case 'penalties': renderPenalties(); break;
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-item').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      renderContent();
+    }
+
+    // ── Dashboard ──
+    function renderDashboard() {
+      if (!dashboardData || !dashboardData.members.length) {
+        document.getElementById('content').innerHTML = `
+          <div class="empty-state">
+            <h3>아직 참가자가 없어요</h3>
+            <p>관리자 페이지에서<br>멤버를 등록해주세요</p>
+          </div>`;
+        return;
+      }
+
+      const { members, settings } = dashboardData;
+      const now = new Date();
+      const weekStartStr = getCurrentWeekStart(now);
+
+      // ★ 이번 달 km 기준으로 정렬 (내림차순)
+      const sorted = [...members].sort((a, b) => (b.monthlyKm || 0) - (a.monthlyKm || 0));
+
+      // 원형 프로그레스 파라미터
+      const r = 20, stroke = 4, circ = 2 * Math.PI * r;
+
+      let html = '<div class="member-list">';
+      for (let i = 0; i < sorted.length; i++) {
+        const m = sorted[i];
+        const wp = m.penalties.find(p => p.week_start === weekStartStr);
+        const weekKm = wp ? (wp.total_km || 0) : 0;
+        const monthlyKm = m.monthlyKm || 0;
+        const pct = Math.min((weekKm / settings.requiredKm) * 100, 100);
+        const ringColor = pct >= 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+        const offset = circ - (pct / 100) * circ;
+
+        let stTxt, stCls;
+        if (wp?.passed) { stTxt = '통과 ✓'; stCls = 'status-pass'; }
+        else { stTxt = '진행중'; stCls = 'status-ongoing'; }
+
+        const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+        const cal = buildMiniCalendar(m, now.getFullYear(), now.getMonth());
+
+        html += `
+          <div class="member-card" id="card-${i}">
+            <div class="member-header">
+              <span class="member-name">
+                <span class="member-rank ${rankClass}">${i + 1}</span>
+                ${m.profile ? `<img class="member-avatar" src="${m.profile}" alt="">` : ''}
+                ${m.name || 'User'}
+              </span>
+              <span class="member-status ${stCls}">${stTxt}</span>
+            </div>
+            <div class="member-summary" onclick="toggleCard(${i})">
+              <div class="summary-left">
+                <div class="summary-progress-ring">
+                  <svg width="52" height="52" viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--bg-hover)" stroke-width="${stroke}"/>
+                    <circle cx="26" cy="26" r="${r}" fill="none" stroke="${ringColor}" stroke-width="${stroke}"
+                      stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="round"/>
+                  </svg>
+                  <div class="ring-text">
+                    <span class="ring-km" style="color:${ringColor}">${weekKm}</span>
+                    <span class="ring-unit">km</span>
+                  </div>
+                </div>
+                <div class="summary-info">
+                  <div class="summary-week">이번 주 <strong>${weekKm}/${settings.requiredKm}km</strong></div>
+                  <div class="summary-month">&#x1F4C5; 이번 달 <strong style="color:var(--primary)">${monthlyKm}km</strong></div>
+                  <div class="summary-penalty">${m.totalPenalty > 0 ? `&#x26A0;&#xFE0F; 누적 벌금 ${(m.totalPenalty/10000).toFixed(0)}만원` : '&#x2705; 벌금 없음'}</div>
+                </div>
+              </div>
+              <span class="summary-chevron">&#x25BC;</span>
+            </div>
+            <div class="member-detail">
+              <div class="member-detail-inner">
+                ${cal}
+                <div class="calendar-legend">
+                  <div class="legend-item"><div class="legend-dot" style="background:rgba(96,165,250,0.4);box-shadow:inset 0 0 0 1px rgba(96,165,250,0.6)"></div>10km+</div>
+                  <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,0.5)"></div>5km+</div>
+                  <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.4)"></div>5km미만</div>
+                  <div class="legend-item"><div class="legend-dot" style="border:2px solid var(--primary);width:6px;height:6px"></div>오늘</div>
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }
+      html += '</div>';
+      document.getElementById('content').innerHTML = html;
+    }
+
+    function toggleCard(idx) {
+      const card = document.getElementById('card-' + idx);
+      card.classList.toggle('open');
+    }
+
+    function buildMiniCalendar(member, year, month) {
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const startDay = firstDay.getDay();
+      const daysInMonth = lastDay.getDate();
+      const today = new Date();
+
+      const runDates = {};
+      const allRuns = member.allRuns || member.activities || [];
+      for (const a of allRuns) {
+        const d = a.start_date_local.split('T')[0];
+        const [y, mo, da] = d.split('-').map(Number);
+        if (y === year && (mo - 1) === month) {
+          if (!runDates[da]) runDates[da] = [];
+          runDates[da].push(a);
+        }
+      }
+
+      const hd = ['일','월','화','수','목','금','토'];
+      let h = '<div class="mini-calendar">';
+      hd.forEach(x => { h += `<div class="mini-cal-header">${x}</div>`; });
+      for (let i = 0; i < startDay; i++) h += '<div class="mini-cal-day empty"></div>';
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+        const has10k = runDates[d]?.some(a => a.distance >= 10000);
+        const has5k = runDates[d]?.some(a => a.distance >= 5000);
+        const hasShort = runDates[d] && !has5k;
+        let c = 'mini-cal-day';
+        if (isToday) c += ' today';
+        if (has10k) c += ' has-run-long';
+        else if (has5k) c += ' has-run';
+        else if (hasShort) c += ' has-run-short';
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        h += `<div class="${c}" onclick="showDayDetail('${dateStr}')" style="cursor:pointer">${d}</div>`;
+      }
+      h += '</div>';
+      return h;
+    }
+
+    // ── 날짜별 기록 모달 ──
+    function showDayDetail(dateStr) {
+      if (!dashboardData) return;
+      const [y, m, d] = dateStr.split('-');
+      const dateLabel = `${Number(m)}월 ${Number(d)}일`;
+
+      const dayRuns = [];
+      for (const member of dashboardData.members) {
+        const allRuns = member.allRuns || member.activities || [];
+        for (const run of allRuns) {
+          if (run.start_date_local.split('T')[0] === dateStr) {
+            dayRuns.push({ ...run, memberName: member.name, memberProfile: member.profile });
+          }
+        }
+      }
+
+      let html = '<div class="modal-title">&#x1F4C5; ' + dateLabel + ' 러닝 기록</div>';
+
+      if (dayRuns.length === 0) {
+        html += '<div class="modal-empty">&#x1F3C3; 이 날은 러닝 기록이 없습니다</div>';
+      } else {
+        for (const run of dayRuns) {
+          const km = (run.distance / 1000).toFixed(2);
+          const mins = Math.floor(run.moving_time / 60);
+          const secs = run.moving_time % 60;
+          const pace = run.distance > 0 ? (run.moving_time / 60) / (run.distance / 1000) : 0;
+          const paceMin = Math.floor(pace);
+          const paceSec = Math.round((pace - paceMin) * 60);
+          const timeStr = run.start_date_local.split('T')[1]?.substring(0,5) || '';
+
+          let badge = '', badgeClass = '';
+          if (run.distance >= 10000) { badge = '장거리'; badgeClass = 'badge-long'; }
+          else if (run.distance >= 5000) { badge = '5km+'; badgeClass = 'badge-ok'; }
+          else { badge = '5km 미만'; badgeClass = 'badge-short'; }
+
+          const stravaUrl = run.activity_id ? 'https://www.strava.com/activities/' + run.activity_id : '';
+
+          html += `
+            <div class="run-card"${stravaUrl ? ` onclick="window.open('${stravaUrl}','_blank')" style="cursor:pointer"` : ''}>
+              <div class="run-card-header">
+                <div>
+                  <div class="run-card-name">${run.name || '러닝'}</div>
+                  <div class="run-card-member">${run.memberName}${timeStr ? ' · ' + timeStr : ''}</div>
+                </div>
+                <span class="run-badge ${badgeClass}">${badge}</span>
+              </div>
+              <div class="run-card-stats">
+                <div class="run-stat">
+                  <div class="run-stat-value">${km}</div>
+                  <div class="run-stat-label">km</div>
+                </div>
+                <div class="run-stat">
+                  <div class="run-stat-value">${mins}'${String(secs).padStart(2,'0')}"</div>
+                  <div class="run-stat-label">시간</div>
+                </div>
+                <div class="run-stat">
+                  <div class="run-stat-value">${paceMin}'${String(paceSec).padStart(2,'0')}"</div>
+                  <div class="run-stat-label">페이스</div>
+                </div>
+              </div>
+              ${stravaUrl ? '<div style="text-align:center;margin-top:10px"><span style="color:var(--primary);font-size:12px;font-weight:600">Strava에서 상세보기 →</span></div>' : ''}
+            </div>`;
+        }
+      }
+
+      document.getElementById('modalContent').innerHTML = html;
+      document.getElementById('runModal').classList.add('show');
+    }
+
+    function closeModal(e) {
+      if (e.target === document.getElementById('runModal')) {
+        document.getElementById('runModal').classList.remove('show');
+      }
+    }
+
+    // ── Calendar Tab ──
+    function renderCalendar() {
+      if (!dashboardData?.members.length) {
+        document.getElementById('content').innerHTML = '<div class="empty-state"><h3>참가자가 없어요</h3></div>';
+        return;
+      }
+      const year = calendarDate.getFullYear();
+      const month = calendarDate.getMonth();
+      const mn = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+      // 달력 탭도 이번 달 km 순으로 정렬
+      const sorted = [...dashboardData.members].sort((a, b) => (b.monthlyKm || 0) - (a.monthlyKm || 0));
+
+      let html = `
+        <div class="month-nav">
+          <button onclick="changeMonth(-1)">&#x25C0;</button>
+          <div class="month-title">${year}년 ${mn[month]}</div>
+          <button onclick="changeMonth(1)">&#x25B6;</button>
+        </div>
+        <div class="member-list">`;
+
+      for (const m of sorted) {
+        const monthlyKm = m.monthlyKm || 0;
+        html += `
+          <div class="member-card">
+            <div class="member-header">
+              <span class="member-name">
+                ${m.profile ? `<img class="member-avatar" src="${m.profile}" alt="">` : ''}
+                ${m.name}
+              </span>
+              <span class="monthly-badge">&#x1F4C5; ${monthlyKm}km</span>
+            </div>
+            <div class="member-body" style="padding:0 16px 14px">
+              ${buildMiniCalendar(m, year, month)}
+              <div class="calendar-legend">
+                <div class="legend-item"><div class="legend-dot" style="background:rgba(96,165,250,0.4);box-shadow:inset 0 0 0 1px rgba(96,165,250,0.6)"></div>10km+</div>
+                <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,0.5)"></div>5km+</div>
+                <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.4)"></div>5km미만</div>
+              </div>
+            </div>
+          </div>`;
+      }
+      html += '</div>';
+      document.getElementById('content').innerHTML = html;
+    }
+
+    function changeMonth(d) { calendarDate.setMonth(calendarDate.getMonth() + d); renderCalendar(); }
+
+    // ── Penalties Tab ──
+    // 주차 번호 계산 (동적 설정 기반)
+    function getWeekNumber(weekStart) {
+      const settings = dashboardData?.settings || {};
+      const cStart = settings.challengeStart || '2026-04-19';
+      const fEnd   = settings.firstWeekEnd   || '2026-04-26';
+      const allWeekStarts = [cStart];
+      // firstWeekEnd 다음날부터 첫 번째 월요일
+      let cur = new Date(fEnd + 'T00:00:00');
+      cur.setDate(cur.getDate() + 1);
+      while (cur.getDay() !== 1) cur.setDate(cur.getDate() + 1);
+      for (let i = 0; i < 104; i++) {
+        allWeekStarts.push(cur.toISOString().split('T')[0]);
+        cur.setDate(cur.getDate() + 7);
+      }
+      const idx = allWeekStarts.indexOf(weekStart);
+      return idx >= 0 ? idx + 1 : null;
+    }
+
+    function renderPenalties() {
+      if (!dashboardData?.members.length) {
+        document.getElementById('content').innerHTML = '<div class="empty-state"><h3>참가자가 없어요</h3></div>';
+        return;
+      }
+      const { members } = dashboardData;
+      const sorted = [...members].sort((a, b) => (b.monthlyKm || 0) - (a.monthlyKm || 0));
+
+      // 모든 주차 수집 후 번호 매기기
+      const allWeeks = new Set();
+      sorted.forEach(m => m.penalties.forEach(p => allWeeks.add(p.week_start)));
+      const sortedWeeks = [...allWeeks].sort().reverse(); // 최신 주부터
+
+      // 현재 주 파악
+      const now = new Date();
+      const currentWeekStart = getCurrentWeekStart(now);
+
+      let html = `
+        <div class="penalty-section">
+          <div class="penalty-header"><h2>&#x1F4B0; 누적 벌금</h2></div>
+          <div class="penalty-summary">`;
+
+      for (const m of sorted) {
+        const failed = m.penalties.filter(p => !p.passed).length;
+        const color = m.totalPenalty > 0 ? 'var(--danger)' : 'var(--success)';
+        html += `
+          <div class="penalty-row">
+            <div class="penalty-row-left">
+              ${m.profile ? `<img style="width:28px;height:28px;border-radius:50%;object-fit:cover" src="${m.profile}" alt="">` : ''}
+              <div class="penalty-row-name">${m.name}</div>
+            </div>
+            <div class="penalty-row-info">
+              <div class="penalty-row-weeks">${failed > 0 ? `${failed}주 미달` : '전주 통과'}</div>
+              <div class="penalty-row-amount" style="color:${color}">${m.totalPenalty > 0 ? (m.totalPenalty/10000).toFixed(0) + '만원' : '0원'}</div>
+            </div>
+          </div>`;
+      }
+      html += '</div></div>';
+
+      // 주간 상세 (주차별 섹션)
+      for (const w of sortedWeeks) {
+        const weekNum = getWeekNumber(w);
+        const weekLabel = weekNum ? `${weekNum}주차` : w.slice(5);
+        const weekPenalty = sorted[0]?.penalties.find(p => p.week_start === w);
+        const weStr = weekPenalty ? weekPenalty.week_end : w;
+        const dateRange = `${w.slice(5).replace('-','/')} ~ ${weStr.slice(5).replace('-','/')}`;
+        const isCurrent = w === currentWeekStart;
+
+        // 이번 주 전체 통과/미달 요약
+        const passCount = sorted.filter(m => m.penalties.find(p => p.week_start === w)?.passed).length;
+        const failCount = sorted.length - passCount;
+
+        html += `
+          <div class="penalty-section">
+            <div class="penalty-header" style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <h2 style="display:flex;align-items:center;gap:8px">
+                  &#x1F4CB; ${weekLabel}
+                  ${isCurrent ? '<span style="font-size:11px;background:rgba(252,76,2,0.2);color:var(--primary);padding:2px 8px;border-radius:10px;font-weight:700">진행중</span>' : ''}
+                </h2>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${dateRange}</div>
+              </div>
+              <div style="text-align:right;font-size:12px">
+                <span style="color:var(--success);font-weight:700">✅ ${passCount}명</span>
+                ${failCount > 0 ? `<span style="color:var(--danger);font-weight:700;margin-left:8px">❌ ${failCount}명</span>` : ''}
+              </div>
+            </div>
+            <div style="padding:8px 16px 14px;display:flex;flex-direction:column;gap:8px">`;
+
+        // 멤버별 결과를 통과/미달 순으로
+        const weekMembers = [...sorted].sort((a, b) => {
+          const pa = a.penalties.find(p => p.week_start === w);
+          const pb = b.penalties.find(p => p.week_start === w);
+          const kmA = pa?.total_km || 0;
+          const kmB = pb?.total_km || 0;
+          return kmB - kmA;
+        });
+
+        for (const m of weekMembers) {
+          const p = m.penalties.find(p => p.week_start === w);
+          if (!p) continue;
+          const barPct = Math.min((p.total_km / 20) * 100, 100);
+          const barColor = p.passed ? 'var(--success)' : p.total_km >= 10 ? 'var(--warning)' : 'var(--danger)';
+          const statusIcon = p.passed ? '✅' : '❌';
+          const penaltyTxt = p.passed ? '' : `<span style="color:var(--danger);font-size:11px;font-weight:700">-${(p.penalty_amount/10000).toFixed(0)}만원</span>`;
+
+          html += `
+              <div style="background:var(--bg);border-radius:10px;padding:10px 14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    ${m.profile ? `<img style="width:24px;height:24px;border-radius:50%;object-fit:cover" src="${m.profile}" alt="">` : ''}
+                    <span style="font-size:13px;font-weight:600">${m.name}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:13px;font-weight:800;color:${barColor}">${p.total_km}km</span>
+                    <span>${statusIcon}</span>
+                    ${penaltyTxt}
+                  </div>
+                </div>
+                <div style="height:5px;background:var(--bg-hover);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:${barPct}%;background:${barColor};border-radius:3px;transition:width 0.4s ease"></div>
+                </div>
+              </div>`;
+        }
+
+        html += `</div></div>`;
+      }
+
+      document.getElementById('content').innerHTML = html;
+    }
+
+    // ── 챌린지 정보 바 렌더링 ──
+    function renderChallengeBar() {
+      if (!dashboardData?.settings) return;
+      const s = dashboardData.settings;
+      const bar = document.getElementById('challengeBar');
+      const nameSpan = document.getElementById('challengeNameSpan');
+      const periodSpan = document.getElementById('challengePeriodSpan');
+      if (!bar) return;
+      bar.style.display = 'flex';
+      nameSpan.innerHTML = `&#x1F3C3; <strong>${s.challengeName || 'SM러닝크루'}</strong>`;
+      const start = s.challengeStart ? s.challengeStart.replace(/-/g,'/') : '';
+      const end   = s.challengeEnd   ? s.challengeEnd.replace(/-/g,'/')   : '진행중';
+      periodSpan.textContent = `${start} ~ ${end}  |  주 ${s.requiredKm}km  |  벌금 ${(s.penaltyAmount/10000).toFixed(0)}만원`;
+    }
+
+    // ── 마감 임박 배너 (목/금/토, 미달인 경우) ──
+    function checkDeadlineBanner() {
+      if (document.getElementById('deadline-banner')) return; // 이미 표시 중
+      const me = getMyInfo();
+      if (!me || !dashboardData) return;
+
+      const now = new Date();
+      const day = now.getDay(); // 4=목, 5=금, 6=토
+      if (![4, 5, 6].includes(day)) return;
+
+      const member = dashboardData.members.find(m => String(m.strava_id) === String(me.sid));
+      if (!member) return;
+
+      const weekStart = getCurrentWeekStart(now);
+      const penalty = member.penalties.find(p => p.week_start === weekStart);
+      if (!penalty || penalty.passed) return;
+
+      const settings = dashboardData.settings || {};
+      const remaining = Math.max(0, (settings.requiredKm || 20) - (penalty.total_km || 0));
+      if (remaining === 0) return;
+
+      // 오늘 이미 닫았으면 표시 안 함
+      const dismissKey = `banner_dismissed_${weekStart}_${now.toDateString()}`;
+      if (sessionStorage.getItem(dismissKey)) return;
+
+      const dayNames = ['일','월','화','수','목','금','토'];
+      const banner = document.createElement('div');
+      banner.id = 'deadline-banner';
+      banner.innerHTML = `
+        <div>
+          <div style="font-weight:800;font-size:14px">&#x23F0; 마감 임박! ${dayNames[day]}요일</div>
+          <div style="font-size:12px;opacity:0.9">${member.name}님, ${remaining.toFixed(1)}km 더 뛰어야 해요! (현재 ${penalty.total_km}/${settings.requiredKm}km)</div>
+        </div>
+        <button onclick="dismissBanner('${dismissKey}')" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">닫기</button>
+      `;
+      // 헤더 뒤에 삽입
+      const header = document.querySelector('.header');
+      if (header) header.after(banner);
+      else document.body.prepend(banner);
+    }
+
+    function dismissBanner(key) {
+      if (key) sessionStorage.setItem(key, '1');
+      document.getElementById('deadline-banner')?.remove();
+    }
+
+    // ── 푸시 알림 토글 ──
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = atob(base64);
+      return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+    }
+
+    async function toggleNotification() {
+      if (!('Notification' in window) || !('PushManager' in window)) {
+        showToast('이 브라우저는 푸시 알림을 지원하지 않아요', 'error'); return;
+      }
+      const reg = await navigator.serviceWorker.ready.catch(() => null);
+      if (!reg) { showToast('서비스워커를 찾을 수 없습니다', 'error'); return; }
+
+      const existingSub = await reg.pushManager.getSubscription().catch(() => null);
+      if (existingSub) {
+        // 알림 해제
+        await existingSub.unsubscribe();
+        await fetch('/api/subscribe', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: existingSub.endpoint })
+        }).catch(() => {});
+        showToast('알림이 해제되었습니다');
+        updateNotifyBtnState();
+        return;
+      }
+
+      // 알림 구독
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        showToast('알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요', 'error'); return;
+      }
+
+      const vapidPublicKey = dashboardData?.settings?.vapidPublicKey;
+      if (!vapidPublicKey) { showToast('서버에 VAPID 키가 설정되지 않았습니다', 'error'); return; }
+
+      try {
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+        });
+        const me = getMyInfo();
+        await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ strava_id: me.sid, subscription: sub.toJSON() })
+        });
+        showToast('알림이 설정되었습니다! 목/금/토 오후 6시에 알려드릴게요 🔔', 'success');
+        updateNotifyBtnState();
+      } catch (err) {
+        showToast('알림 설정 실패: ' + err.message, 'error');
+      }
+    }
+
+    // ── Toast ──
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (type ? ' ' + type : '');
+      setTimeout(() => t.className = 'toast', 2800);
+    }
+
+    init();
+  </script>
+</body>
+</html>

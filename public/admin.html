@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 - SM러닝크루</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0F172A; color: #F1F5F9;
+      min-height: 100vh; padding: 20px;
+    }
+    .container { max-width: 480px; margin: 0 auto; }
+
+    h1 { font-size: 22px; margin-bottom: 8px; color: #FC4C02; }
+    .subtitle { color: #94A3B8; font-size: 13px; margin-bottom: 24px; }
+
+    /* 로그인 */
+    .login-box { background: #1E293B; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+    .login-box h2 { font-size: 16px; margin-bottom: 16px; }
+
+    /* 폼 */
+    label { display: block; font-size: 13px; color: #94A3B8; margin-bottom: 6px; margin-top: 16px; }
+    label:first-child { margin-top: 0; }
+    input {
+      width: 100%; padding: 12px 14px; border-radius: 10px;
+      border: 1px solid #334155; background: #0F172A; color: #F1F5F9;
+      font-size: 14px; outline: none;
+    }
+    input:focus { border-color: #FC4C02; }
+    input::placeholder { color: #475569; }
+
+    .btn {
+      display: inline-block; padding: 12px 24px; border-radius: 10px;
+      border: none; font-size: 14px; font-weight: 700; cursor: pointer;
+      margin-top: 20px; width: 100%; text-align: center;
+    }
+    .btn-primary { background: #FC4C02; color: white; }
+    .btn-primary:active { background: #E34402; }
+    .btn-primary:disabled { background: #334155; color: #64748B; cursor: not-allowed; }
+    .btn-danger { background: #DC2626; color: white; padding: 8px 14px; width: auto; margin-top: 0; font-size: 12px; }
+
+    /* 카드 */
+    .section { background: #1E293B; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+    .section h2 { font-size: 16px; margin-bottom: 16px; }
+
+    .member-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid #334155;
+    }
+    .member-item:last-child { border-bottom: none; }
+    .member-info { flex: 1; }
+    .member-name { font-size: 15px; font-weight: 600; }
+    .member-meta { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+    .member-status { font-size: 11px; padding: 3px 8px; border-radius: 6px; margin-left: 8px; }
+    .status-ok { background: rgba(34,197,94,0.2); color: #22C55E; }
+    .status-no { background: rgba(239,68,68,0.2); color: #EF4444; }
+
+    /* 가이드 */
+    .guide { background: #1E293B; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+    .guide h2 { font-size: 16px; margin-bottom: 12px; }
+    .guide ol { padding-left: 20px; }
+    .guide li { color: #94A3B8; font-size: 13px; line-height: 2.2; }
+    .guide code { background: #334155; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #FC4C02; }
+    .guide a { color: #60A5FA; text-decoration: none; }
+
+    .toast {
+      position: fixed; bottom: 20px; left: 20px; right: 20px;
+      background: #1E293B; border: 1px solid #334155; border-radius: 12px;
+      padding: 14px; font-size: 14px; text-align: center; z-index: 200;
+      transform: translateY(100px); opacity: 0; transition: all 0.3s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: #22C55E; }
+    .toast.error { border-color: #EF4444; }
+
+    .back-link { display: inline-block; margin-bottom: 20px; color: #60A5FA; text-decoration: none; font-size: 14px; }
+
+    .hide { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back-link">← 대시보드로 돌아가기</a>
+    <h1>🔧 관리자 페이지</h1>
+    <p class="subtitle">멤버 추가/삭제 및 Strava 토큰 관리</p>
+
+    <!-- 비밀번호 입력 -->
+    <div class="login-box" id="loginBox">
+      <h2>🔐 관리자 인증</h2>
+      <label>비밀번호</label>
+      <input type="password" id="adminPw" placeholder="관리자 비밀번호 입력">
+      <button class="btn btn-primary" onclick="adminLogin()">로그인</button>
+    </div>
+
+    <!-- 관리자 영역 (로그인 후) -->
+    <div id="adminArea" class="hide">
+
+      <!-- 챌린지 설정 -->
+      <div class="section">
+        <h2>⚙️ 챌린지 설정</h2>
+        <label>챌린지 이름</label>
+        <input type="text" id="cfgName" placeholder="예: SM러닝크루 시즌 1">
+        <label>시작일 (1주차 시작)</label>
+        <input type="date" id="cfgStart">
+        <label>1주차 종료일 <span style="color:#64748B;font-weight:400">(시작일부터 첫 번째 일요일)</span></label>
+        <input type="date" id="cfgFirstEnd">
+        <label>챌린지 종료일 <span style="color:#64748B;font-weight:400">(비워두면 계속 진행)</span></label>
+        <input type="date" id="cfgEnd">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+          <div>
+            <label style="margin-top:0">주간 목표 km</label>
+            <input type="number" id="cfgKm" min="1" max="200" placeholder="20">
+          </div>
+          <div>
+            <label style="margin-top:0">주간 벌금 (원)</label>
+            <input type="number" id="cfgPenalty" min="0" step="10000" placeholder="100000">
+          </div>
+        </div>
+        <button class="btn btn-primary" id="saveSettingsBtn" onclick="saveSettings()">설정 저장 + 벌금 재계산</button>
+        <div id="settingsStatus" style="margin-top:12px;font-size:13px;color:#94A3B8"></div>
+      </div>
+
+      <!-- 알림 관리 -->
+      <div class="section">
+        <h2>🔔 알림 관리</h2>
+        <div id="vapidStatus" style="padding:12px;border-radius:10px;margin-bottom:16px;font-size:13px"></div>
+        <button class="btn btn-primary" id="notifyBtn" onclick="sendNotifications()" style="margin-top:0">
+          ⏰ 마감 임박 알림 지금 발송
+        </button>
+        <p style="color:#94A3B8;font-size:12px;margin-top:10px">
+          목/금/토 오후 6시(KST)에 Vercel Cron이 자동 발송합니다.<br>
+          이 버튼은 즉시 수동 발송용입니다.
+        </p>
+
+        <!-- VAPID 설정 가이드 (접기) -->
+        <details style="margin-top:16px">
+          <summary style="cursor:pointer;font-size:13px;color:#60A5FA;font-weight:600">📋 VAPID 키 설정 방법</summary>
+          <div style="background:#0F172A;border-radius:10px;padding:16px;margin-top:10px">
+            <ol style="padding-left:20px;color:#94A3B8;font-size:12px;line-height:2.2">
+              <li>터미널에서 실행: <code>npx web-push generate-vapid-keys</code></li>
+              <li>출력된 Public Key → <code>VAPID_PUBLIC_KEY</code> 환경변수에 저장</li>
+              <li>출력된 Private Key → <code>VAPID_PRIVATE_KEY</code> 환경변수에 저장</li>
+              <li><code>VAPID_EMAIL=mailto:your@email.com</code> 설정</li>
+              <li><code>CRON_SECRET=임의의_긴_문자열</code> 설정 (Cron 보안)</li>
+              <li>Vercel 대시보드 → Settings → Environment Variables에 추가</li>
+              <li>재배포 후 멤버들이 앱에서 🔔 버튼으로 알림 구독</li>
+            </ol>
+          </div>
+        </details>
+      </div>
+
+      <!-- 1단계: 권한 링크 생성 -->
+      <div class="section">
+        <h2>1️⃣ 권한 링크 생성</h2>
+        <p style="color:#94A3B8;font-size:13px;margin-bottom:16px">멤버의 Client ID를 입력하면 권한 부여 링크가 생성됩니다. 멤버에게 이 링크를 보내주세요.</p>
+        <label>Client ID (숫자)</label>
+        <input type="text" id="linkClientId" placeholder="멤버의 Strava Client ID">
+        <button class="btn btn-primary" style="margin-bottom:12px" onclick="generateLink()">권한 링크 생성</button>
+        <div id="authLinkResult" class="hide" style="background:#0F172A;border-radius:10px;padding:14px;margin-top:8px">
+          <p style="font-size:12px;color:#94A3B8;margin-bottom:8px">아래 링크를 멤버에게 보내주세요:</p>
+          <input type="text" id="authLinkOutput" readonly style="font-size:12px;margin-bottom:8px">
+          <button class="btn btn-primary" style="font-size:12px;padding:8px 16px" onclick="copyLink()">링크 복사</button>
+          <p style="font-size:11px;color:#64748B;margin-top:10px">멤버가 링크를 열고 승인하면 화면에 <code>code=...</code> 가 표시됩니다. 그 코드를 받아서 아래 2단계에 입력하세요.</p>
+        </div>
+      </div>
+
+      <!-- 2단계: 멤버 등록 -->
+      <div class="section">
+        <h2>2️⃣ 멤버 등록</h2>
+        <label>이름 *</label>
+        <input type="text" id="memberName" placeholder="예: 전동준">
+        <label>Client ID *</label>
+        <input type="text" id="clientId" placeholder="Strava Client ID">
+        <label>Client Secret *</label>
+        <input type="text" id="clientSecret" placeholder="Strava Client Secret">
+        <label>Authorization Code * (멤버가 승인 후 받은 코드)</label>
+        <input type="text" id="authCode" placeholder="멤버가 전달한 code 값">
+        <button class="btn btn-primary" id="addBtn" onclick="addMember()">멤버 등록 + 기록 동기화</button>
+      </div>
+
+      <!-- 가이드 -->
+      <div class="guide">
+        <h2>📋 전체 흐름</h2>
+        <ol>
+          <li>멤버가 <a href="https://www.strava.com/settings/api" target="_blank">strava.com/settings/api</a> 에서 API 앱 생성</li>
+          <li>멤버가 <code>Client ID</code>와 <code>Client Secret</code>을 대표님한테 전달</li>
+          <li>대표님이 위 1단계에서 권한 링크 생성 → 멤버에게 전송</li>
+          <li>멤버가 링크 열고 "승인" 클릭 → 화면에 나온 코드를 대표님한테 전달</li>
+          <li>대표님이 2단계에서 이름 + Client ID + Secret + 코드 입력 → 등록 완료!</li>
+        </ol>
+      </div>
+
+      <!-- 현재 멤버 목록 -->
+      <div class="section">
+        <h2>👥 등록된 멤버</h2>
+        <div id="memberList">로딩중...</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let adminPassword = '';
+
+    function adminLogin() {
+      adminPassword = document.getElementById('adminPw').value;
+      if (!adminPassword) return showToast('비밀번호를 입력해주세요', 'error');
+
+      // 멤버 목록 불러와서 비밀번호 검증
+      fetch('/api/members')
+        .then(r => r.json())
+        .then(() => {
+          document.getElementById('loginBox').classList.add('hide');
+          document.getElementById('adminArea').classList.remove('hide');
+          loadMembers();
+          loadSettings();
+          // 비밀번호 기억
+          sessionStorage.setItem('admin_pw', adminPassword);
+        })
+        .catch(() => showToast('서버 연결 실패', 'error'));
+    }
+
+    async function loadMembers() {
+      try {
+        const res = await fetch('/api/dashboard');
+        const data = await res.json();
+        const list = document.getElementById('memberList');
+
+        if (!data.members.length) {
+          list.innerHTML = '<p style="color:#94A3B8;font-size:13px">등록된 멤버가 없습니다</p>';
+          return;
+        }
+
+        list.innerHTML = data.members.map(m => `
+          <div class="member-item">
+            <div class="member-info">
+              <div class="member-name">
+                ${m.name}
+                <span class="member-status ${m.connected ? 'status-ok' : 'status-no'}">
+                  ${m.connected ? '연결됨' : '미연결'}
+                </span>
+              </div>
+              <div class="member-meta">
+                ID: ${m.strava_id} · 러닝 ${m.activities?.length || 0}개 · 벌금 ${(m.totalPenalty/10000).toFixed(0)}만원
+              </div>
+            </div>
+            <button class="btn btn-danger" onclick="deleteMember(${m.strava_id}, '${m.name}')">삭제</button>
+          </div>
+        `).join('');
+      } catch (e) {
+        document.getElementById('memberList').innerHTML = '<p style="color:#EF4444">로딩 실패</p>';
+      }
+    }
+
+    function generateLink() {
+      const clientId = document.getElementById('linkClientId').value.trim();
+      if (!clientId) return showToast('Client ID를 입력해주세요', 'error');
+
+      const redirectUri = window.location.origin + '/auth/token-callback';
+      const url = 'https://www.strava.com/oauth/authorize?client_id=' + clientId +
+        '&response_type=code&redirect_uri=' + encodeURIComponent(redirectUri) +
+        '&scope=activity:read_all&approval_prompt=auto';
+
+      document.getElementById('authLinkOutput').value = url;
+      document.getElementById('authLinkResult').classList.remove('hide');
+    }
+
+    function copyLink() {
+      const input = document.getElementById('authLinkOutput');
+      input.select();
+      navigator.clipboard.writeText(input.value).then(() => {
+        showToast('링크가 복사되었습니다', 'success');
+      }).catch(() => {
+        document.execCommand('copy');
+        showToast('링크가 복사되었습니다', 'success');
+      });
+    }
+
+    async function addMember() {
+      const name = document.getElementById('memberName').value.trim();
+      const client_id = document.getElementById('clientId').value.trim();
+      const client_secret = document.getElementById('clientSecret').value.trim();
+      const auth_code = document.getElementById('authCode').value.trim();
+
+      if (!name || !client_id || !client_secret || !auth_code) return showToast('모든 항목을 입력해주세요', 'error');
+
+      const btn = document.getElementById('addBtn');
+      btn.disabled = true;
+      btn.textContent = '등록 중...';
+
+      try {
+        const res = await fetch('/api/admin/add-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: adminPassword, name, client_id, client_secret, auth_code })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          showToast(`${data.name} 등록 완료! 기록 동기화됨`, 'success');
+          document.getElementById('memberName').value = '';
+          document.getElementById('clientId').value = '';
+          document.getElementById('clientSecret').value = '';
+          document.getElementById('authCode').value = '';
+          loadMembers();
+        } else {
+          showToast(data.error || '등록 실패', 'error');
+        }
+      } catch (e) {
+        showToast('서버 오류', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '멤버 등록 + 기록 동기화';
+      }
+    }
+
+    async function deleteMember(stravaId, name) {
+      if (!confirm(`${name} 멤버를 삭제하시겠습니까?\n모든 기록과 벌금 데이터가 삭제됩니다.`)) return;
+
+      try {
+        const res = await fetch(`/api/members/${stravaId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: adminPassword })
+        });
+
+        if (res.ok) {
+          showToast(`${name} 삭제 완료`, 'success');
+          loadMembers();
+        } else {
+          const data = await res.json();
+          showToast(data.error || '삭제 실패', 'error');
+        }
+      } catch (e) {
+        showToast('서버 오류', 'error');
+      }
+    }
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (type || '');
+      setTimeout(() => t.className = 'toast', 2500);
+    }
+
+    // ── 챌린지 설정 로드 ──
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/settings');
+        const s = await res.json();
+        document.getElementById('cfgName').value     = s.challengeName || '';
+        document.getElementById('cfgStart').value    = s.challengeStart || '';
+        document.getElementById('cfgFirstEnd').value = s.firstWeekEnd || '';
+        document.getElementById('cfgEnd').value      = s.challengeEnd || '';
+        document.getElementById('cfgKm').value       = s.requiredKm || 20;
+        document.getElementById('cfgPenalty').value  = s.penaltyAmount || 100000;
+
+        // VAPID 상태 표시
+        const vapidDiv = document.getElementById('vapidStatus');
+        if (s.vapidConfigured) {
+          vapidDiv.style.background = 'rgba(34,197,94,0.1)';
+          vapidDiv.style.border = '1px solid rgba(34,197,94,0.3)';
+          vapidDiv.innerHTML = '✅ VAPID 키 설정됨 · 푸시 알림 사용 가능';
+          vapidDiv.style.color = '#22C55E';
+        } else {
+          vapidDiv.style.background = 'rgba(245,158,11,0.1)';
+          vapidDiv.style.border = '1px solid rgba(245,158,11,0.3)';
+          vapidDiv.innerHTML = '⚠️ VAPID 키 미설정 · 아래 가이드를 참고해 설정해주세요';
+          vapidDiv.style.color = '#F59E0B';
+          document.getElementById('notifyBtn').disabled = true;
+          document.getElementById('notifyBtn').style.opacity = '0.5';
+        }
+      } catch(e) {
+        console.error('Settings load error:', e);
+      }
+    }
+
+    // ── 챌린지 설정 저장 ──
+    async function saveSettings() {
+      const btn = document.getElementById('saveSettingsBtn');
+      btn.disabled = true; btn.textContent = '저장 중...';
+      const statusDiv = document.getElementById('settingsStatus');
+
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: adminPassword,
+            challengeName: document.getElementById('cfgName').value,
+            challengeStart: document.getElementById('cfgStart').value,
+            firstWeekEnd: document.getElementById('cfgFirstEnd').value,
+            challengeEnd: document.getElementById('cfgEnd').value,
+            requiredKm: document.getElementById('cfgKm').value,
+            penaltyAmount: document.getElementById('cfgPenalty').value
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          statusDiv.style.color = '#22C55E';
+          statusDiv.textContent = '✅ 저장 완료! 벌금이 새 설정으로 재계산되었습니다.';
+          showToast('챌린지 설정 저장 완료', 'success');
+          loadMembers(); // 벌금 변경 반영
+        } else {
+          statusDiv.style.color = '#EF4444';
+          statusDiv.textContent = '❌ ' + (data.error || '저장 실패');
+        }
+      } catch(e) {
+        statusDiv.style.color = '#EF4444';
+        statusDiv.textContent = '❌ 서버 오류';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '설정 저장 + 벌금 재계산';
+      }
+    }
+
+    // ── 알림 수동 발송 ──
+    async function sendNotifications() {
+      const btn = document.getElementById('notifyBtn');
+      btn.disabled = true; btn.textContent = '발송 중...';
+      try {
+        const res = await fetch('/api/admin/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: adminPassword })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const r = data.results;
+          showToast(`발송 완료 · 성공 ${r.sent}건 / 미구독 ${r.skipped}건 / 실패 ${r.failed}건`, 'success');
+        } else {
+          showToast(data.error || '발송 실패', 'error');
+        }
+      } catch(e) {
+        showToast('서버 오류', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⏰ 마감 임박 알림 지금 발송';
+      }
+    }
+
+    // 세션 비밀번호 복원
+    const savedPw = sessionStorage.getItem('admin_pw');
+    if (savedPw) {
+      adminPassword = savedPw;
+      document.getElementById('loginBox').classList.add('hide');
+      document.getElementById('adminArea').classList.remove('hide');
+      loadMembers();
+      loadSettings();
+    }
+  </script>
+</body>
+</html>

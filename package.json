@@ -1,0 +1,17 @@
+{
+  "name": "strava-running-tracker",
+  "version": "1.0.0",
+  "description": "SM러닝크루 트래커 - Strava 연동 주간 러닝 관리 시스템",
+  "scripts": {
+    "dev": "node dev.js",
+    "start": "node dev.js",
+    "build": "echo done"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.37.0",
+    "axios": "^1.6.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "web-push": "^3.6.7"
+  }
+}
