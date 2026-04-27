@@ -487,6 +487,121 @@
       transform: scale(0.96);
     }
 
+    /* ─── Marathon Tab ─── */
+    .marathon-header {
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .marathon-header-sub {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .marathon-filters {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .marathon-filters::-webkit-scrollbar { display: none; }
+    .marathon-filter {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .marathon-filter.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    .marathon-list {
+      padding: 0 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .marathon-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      transition: all 0.15s;
+    }
+    .marathon-card:active { transform: scale(0.98); }
+    .marathon-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .marathon-card-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.4;
+      flex: 1;
+      margin-right: 10px;
+    }
+    .marathon-dday {
+      font-size: 12px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 12px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .marathon-dday.soon { background: rgba(239,68,68,0.15); color: #EF4444; }
+    .marathon-dday.normal { background: rgba(59,130,246,0.15); color: #3B82F6; }
+    .marathon-dday.far { background: rgba(148,163,184,0.1); color: var(--text-muted); }
+    .marathon-card-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .marathon-card-info span { display: flex; align-items: center; gap: 3px; }
+    .marathon-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+    .marathon-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(252,76,2,0.12);
+      color: var(--primary);
+    }
+    .marathon-tag.open {
+      background: rgba(34,197,94,0.15);
+      color: #22C55E;
+    }
+    .marathon-empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    .marathon-empty h3 { font-size: 16px; margin-bottom: 8px; color: var(--text); }
+    .marathon-loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
     /* ─── Region Panel (국내 시도별 / 해외 국가별 공용) ─── */
     .region-panel {
       position: absolute;
@@ -551,9 +666,21 @@
       color: var(--text-muted);
       line-height: 1.4;
     }
+    .region-header .region-toggle {
+      display: none;
+      font-size: 10px;
+      transition: transform 0.2s;
+    }
     @media (max-width: 767px) {
-      .region-panel { width: 180px; right: 6px; top: 6px; max-height: calc(100vh - 260px); }
-      .region-header { padding: 10px 12px; font-size: 12px; }
+      .region-panel { width: 160px; right: 6px; top: 6px; max-height: calc(100vh - 260px); overflow: hidden; }
+      .region-panel.collapsed { overflow: hidden; }
+      .region-panel.collapsed .region-list { display: none; }
+      .region-panel.collapsed { max-height: none; }
+      .region-header { padding: 10px 12px; font-size: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+      .region-header .region-toggle { display: inline-block; }
+      .region-panel.collapsed .region-toggle { transform: rotate(0deg); }
+      .region-panel:not(.collapsed) .region-toggle { transform: rotate(90deg); }
+      .region-panel:not(.collapsed) { overflow-y: auto; }
       .region-item { padding: 8px 10px; }
       .region-name { font-size: 12px; }
       .region-stats { font-size: 12px; }
@@ -603,6 +730,10 @@
     <button class="tab-item" onclick="switchTab('map')" data-tab="map">
       <span class="tab-icon">🗺️</span>
       <span>지도</span>
+    </button>
+    <button class="tab-item" onclick="switchTab('marathon')" data-tab="marathon">
+      <span class="tab-icon">🏅</span>
+      <span>마라톤</span>
     </button>
   </div>
 
@@ -838,6 +969,7 @@
         case 'calendar': renderCalendar(); break;
         case 'penalties': renderPenalties(); break;
         case 'map': renderMap(); break;
+        case 'marathon': renderMarathon(); break;
       }
     }
 
@@ -849,8 +981,9 @@
       // 지도 탭에서는 stats/challenge bar 숨기기 (공간 확보)
       const statsBar = document.getElementById('statsBar');
       const challengeBar = document.getElementById('challengeBar');
-      if (statsBar) statsBar.style.display = tab === 'map' ? 'none' : '';
-      if (challengeBar) challengeBar.style.display = tab === 'map' ? 'none' : '';
+      const hideBars = (tab === 'map' || tab === 'marathon');
+      if (statsBar) statsBar.style.display = hideBars ? 'none' : '';
+      if (challengeBar) challengeBar.style.display = hideBars ? 'none' : '';
       renderContent();
     }
 
@@ -1188,13 +1321,106 @@
         if (lat >= 26.20 && lat <= 26.45 && lng >= 127.60 && lng <= 127.85) return '일본 · 오키나와';
         return '일본 · 기타';
       }
-      if (lat >= 18 && lat <= 54 && lng >= 73 && lng <= 135) return '중국';
-      if (lat >= 5 && lat <= 21 && lng >= 97 && lng <= 110) return '태국/베트남';
-      if (lat >= -11 && lat <= 6 && lng >= 95 && lng <= 141) return '인도네시아';
-      if (lat >= 1 && lat <= 8 && lng >= 103 && lng <= 105) return '싱가포르';
-      if (lat >= 25 && lat <= 50 && lng >= -125 && lng <= -66) return '미국';
-      if (lat >= 35 && lat <= 72 && lng >= -10 && lng <= 40) return '유럽';
-      if (lat >= -47 && lat <= -10 && lng >= 113 && lng <= 154) return '호주';
+      // 중국 지역 세분화
+      if (lat >= 18 && lat <= 54 && lng >= 73 && lng <= 135) {
+        if (lat >= 39.75 && lat <= 40.10 && lng >= 116.15 && lng <= 116.60) return '중국 · 베이징';
+        if (lat >= 31.10 && lat <= 31.40 && lng >= 121.30 && lng <= 121.60) return '중국 · 상하이';
+        if (lat >= 22.45 && lat <= 22.70 && lng >= 113.80 && lng <= 114.30) return '중국 · 선전';
+        if (lat >= 23.00 && lat <= 23.25 && lng >= 113.15 && lng <= 113.45) return '중국 · 광저우';
+        if (lat >= 30.45 && lat <= 30.70 && lng >= 103.90 && lng <= 104.25) return '중국 · 청두';
+        if (lat >= 22.15 && lat <= 22.40 && lng >= 113.45 && lng <= 113.65) return '중국 · 마카오';
+        if (lat >= 22.20 && lat <= 22.45 && lng >= 114.05 && lng <= 114.30) return '중국 · 홍콩';
+        return '중국 · 기타';
+      }
+      // 태국 지역 세분화
+      if (lat >= 5 && lat <= 21 && lng >= 97 && lng <= 106) {
+        if (lat >= 13.60 && lat <= 13.95 && lng >= 100.35 && lng <= 100.70) return '태국 · 방콕';
+        if (lat >= 18.70 && lat <= 18.85 && lng >= 98.90 && lng <= 99.05) return '태국 · 치앙마이';
+        if (lat >= 7.75 && lat <= 8.00 && lng >= 98.25 && lng <= 98.45) return '태국 · 푸켓';
+        if (lat >= 12.85 && lat <= 13.05 && lng >= 100.80 && lng <= 101.00) return '태국 · 파타야';
+        return '태국 · 기타';
+      }
+      // 베트남 지역 세분화
+      if (lat >= 8 && lat <= 24 && lng >= 102 && lng <= 110) {
+        if (lat >= 20.95 && lat <= 21.15 && lng >= 105.70 && lng <= 105.95) return '베트남 · 하노이';
+        if (lat >= 10.70 && lat <= 10.90 && lng >= 106.55 && lng <= 106.80) return '베트남 · 호치민';
+        if (lat >= 15.95 && lat <= 16.15 && lng >= 108.10 && lng <= 108.30) return '베트남 · 다낭';
+        if (lat >= 12.20 && lat <= 12.35 && lng >= 109.10 && lng <= 109.25) return '베트남 · 나트랑';
+        return '베트남 · 기타';
+      }
+      // 인도네시아 지역 세분화
+      if (lat >= -11 && lat <= 6 && lng >= 95 && lng <= 141) {
+        if (lat >= -6.40 && lat <= -6.05 && lng >= 106.65 && lng <= 107.00) return '인도네시아 · 자카르타';
+        if (lat >= -8.85 && lat <= -8.55 && lng >= 115.05 && lng <= 115.35) return '인도네시아 · 발리';
+        if (lat >= -7.35 && lat <= -7.20 && lng >= 112.65 && lng <= 112.85) return '인도네시아 · 수라바야';
+        if (lat >= -6.75 && lat <= -6.55 && lng >= 110.35 && lng <= 110.50) return '인도네시아 · 세마랑';
+        return '인도네시아 · 기타';
+      }
+      // 싱가포르 (도시국가)
+      if (lat >= 1.15 && lat <= 1.48 && lng >= 103.60 && lng <= 104.10) return '싱가포르';
+      // 미국 지역 세분화
+      if (lat >= 25 && lat <= 50 && lng >= -125 && lng <= -66) {
+        if (lat >= 40.60 && lat <= 40.90 && lng >= -74.10 && lng <= -73.70) return '미국 · 뉴욕';
+        if (lat >= 33.90 && lat <= 34.15 && lng >= -118.50 && lng <= -118.10) return '미국 · LA';
+        if (lat >= 37.70 && lat <= 37.85 && lng >= -122.55 && lng <= -122.30) return '미국 · 샌프란시스코';
+        if (lat >= 41.75 && lat <= 42.00 && lng >= -87.80 && lng <= -87.55) return '미국 · 시카고';
+        if (lat >= 25.65 && lat <= 25.90 && lng >= -80.35 && lng <= -80.10) return '미국 · 마이애미';
+        if (lat >= 47.50 && lat <= 47.75 && lng >= -122.45 && lng <= -122.20) return '미국 · 시애틀';
+        if (lat >= 36.05 && lat <= 36.25 && lng >= -115.30 && lng <= -115.05) return '미국 · 라스베이거스';
+        if (lat >= 21.25 && lat <= 21.45 && lng >= -158.00 && lng <= -157.70) return '미국 · 하와이';
+        return '미국 · 기타';
+      }
+      // 유럽 지역 세분화
+      if (lat >= 35 && lat <= 72 && lng >= -10 && lng <= 40) {
+        if (lat >= 48.80 && lat <= 48.92 && lng >= 2.25 && lng <= 2.45) return '유럽 · 파리';
+        if (lat >= 51.40 && lat <= 51.60 && lng >= -0.25 && lng <= 0.05) return '유럽 · 런던';
+        if (lat >= 41.85 && lat <= 41.95 && lng >= 12.40 && lng <= 12.55) return '유럽 · 로마';
+        if (lat >= 41.35 && lat <= 41.45 && lng >= 2.10 && lng <= 2.25) return '유럽 · 바르셀로나';
+        if (lat >= 52.45 && lat <= 52.60 && lng >= 13.30 && lng <= 13.50) return '유럽 · 베를린';
+        if (lat >= 48.10 && lat <= 48.25 && lng >= 11.45 && lng <= 11.70) return '유럽 · 뮌헨';
+        if (lat >= 52.30 && lat <= 52.45 && lng >= 4.80 && lng <= 5.00) return '유럽 · 암스테르담';
+        if (lat >= 47.30 && lat <= 47.45 && lng >= 8.45 && lng <= 8.60) return '유럽 · 취리히';
+        if (lat >= 50.80 && lat <= 50.95 && lng >= 4.30 && lng <= 4.50) return '유럽 · 브뤼셀';
+        if (lat >= 48.15 && lat <= 48.30 && lng >= 16.30 && lng <= 16.50) return '유럽 · 비엔나';
+        if (lat >= 59.85 && lat <= 60.00 && lng >= 10.65 && lng <= 10.85) return '유럽 · 오슬로';
+        if (lat >= 55.60 && lat <= 55.75 && lng >= 12.45 && lng <= 12.65) return '유럽 · 코펜하겐';
+        if (lat >= 40.35 && lat <= 40.50 && lng >= -3.80 && lng <= -3.60) return '유럽 · 마드리드';
+        if (lat >= 38.65 && lat <= 38.80 && lng >= -9.25 && lng <= -9.05) return '유럽 · 리스본';
+        if (lat >= 37.90 && lat <= 38.05 && lng >= 23.65 && lng <= 23.85) return '유럽 · 아테네';
+        if (lat >= 50.02 && lat <= 50.15 && lng >= 14.35 && lng <= 14.50) return '유럽 · 프라하';
+        return '유럽 · 기타';
+      }
+      // 호주 지역 세분화
+      if (lat >= -47 && lat <= -10 && lng >= 113 && lng <= 154) {
+        if (lat >= -33.95 && lat <= -33.75 && lng >= 151.05 && lng <= 151.35) return '호주 · 시드니';
+        if (lat >= -37.90 && lat <= -37.70 && lng >= 144.85 && lng <= 145.10) return '호주 · 멜버른';
+        if (lat >= -27.55 && lat <= -27.35 && lng >= 152.90 && lng <= 153.15) return '호주 · 브리즈번';
+        if (lat >= -32.00 && lat <= -31.85 && lng >= 115.80 && lng <= 116.00) return '호주 · 퍼스';
+        if (lat >= -16.95 && lat <= -16.85 && lng >= 145.70 && lng <= 145.85) return '호주 · 케언즈';
+        return '호주 · 기타';
+      }
+      // 말레이시아
+      if (lat >= 1 && lat <= 7 && lng >= 100 && lng <= 119) {
+        if (lat >= 3.05 && lat <= 3.25 && lng >= 101.60 && lng <= 101.80) return '말레이시아 · 쿠알라룸푸르';
+        return '말레이시아 · 기타';
+      }
+      // 필리핀
+      if (lat >= 4 && lat <= 21 && lng >= 116 && lng <= 127) {
+        if (lat >= 14.45 && lat <= 14.70 && lng >= 120.90 && lng <= 121.10) return '필리핀 · 마닐라';
+        if (lat >= 10.25 && lat <= 10.40 && lng >= 123.85 && lng <= 124.00) return '필리핀 · 세부';
+        return '필리핀 · 기타';
+      }
+      // 대만
+      if (lat >= 21.5 && lat <= 25.5 && lng >= 119.5 && lng <= 122.5) {
+        if (lat >= 25.00 && lat <= 25.12 && lng >= 121.45 && lng <= 121.60) return '대만 · 타이베이';
+        return '대만 · 기타';
+      }
+      // 인도
+      if (lat >= 6 && lat <= 36 && lng >= 68 && lng <= 97) {
+        if (lat >= 18.90 && lat <= 19.15 && lng >= 72.75 && lng <= 73.00) return '인도 · 뭄바이';
+        if (lat >= 28.50 && lat <= 28.75 && lng >= 77.05 && lng <= 77.35) return '인도 · 뉴델리';
+        return '인도 · 기타';
+      }
       return `기타 (${lat.toFixed(1)}, ${lng.toFixed(1)})`;
     }
 
@@ -1323,8 +1549,9 @@
         const control = L.control({ position: 'topright' });
         control.onAdd = function() {
           const div = L.DomUtil.create('div', 'region-panel');
+          if (window.innerWidth < 768) div.classList.add('collapsed');
           div.innerHTML = `
-            <div class="region-header">🇰🇷 지역별 러닝</div>
+            <div class="region-header" onclick="this.parentElement.classList.toggle('collapsed')">🇰🇷 지역별 러닝 <span class="region-toggle">▶</span></div>
             <div class="region-list">${provinceHtml}</div>
           `;
           L.DomEvent.disableClickPropagation(div);
@@ -1397,8 +1624,9 @@
       const control = L.control({ position: 'topright' });
       control.onAdd = function() {
         const div = L.DomUtil.create('div', 'region-panel');
+        if (window.innerWidth < 768) div.classList.add('collapsed');
         div.innerHTML = `
-          <div class="region-header">🌍 해외 러닝 기록</div>
+          <div class="region-header" onclick="this.parentElement.classList.toggle('collapsed')">🌍 해외 러닝 기록 <span class="region-toggle">▶</span></div>
           <div class="region-list">
             <div class="region-item ${allActive ? 'active' : ''}" onclick="filterByCountry(null)">
               <div class="region-name">전체</div>
@@ -1578,6 +1806,94 @@
       }
       const idx = allWeekStarts.indexOf(weekStart);
       return idx >= 0 ? idx + 1 : null;
+    }
+
+    // ── 마라톤 탭 ──
+    let marathonCache = null;
+    let marathonFilter = '전체';
+
+    async function renderMarathon() {
+      const content = document.getElementById('content');
+      content.innerHTML = '<div class="marathon-loading">🏅 마라톤 대회 정보를 불러오는 중...</div>';
+
+      try {
+        if (!marathonCache) {
+          const res = await fetch('/api/marathons');
+          if (!res.ok) throw new Error('API error');
+          marathonCache = await res.json();
+        }
+        renderMarathonUI();
+      } catch (err) {
+        console.error('Marathon load error:', err);
+        content.innerHTML = '<div class="marathon-empty"><h3>대회 정보를 불러올 수 없습니다</h3><p>잠시 후 다시 시도해주세요</p></div>';
+      }
+    }
+
+    function renderMarathonUI() {
+      const content = document.getElementById('content');
+      const { marathons, updatedAt } = marathonCache;
+
+      const filters = ['전체', '접수중', '풀', '하프', '10K'];
+      const filtered = marathons.filter(m => {
+        if (marathonFilter === '전체') return true;
+        if (marathonFilter === '접수중') return m.isOpen;
+        return m.categories.includes(marathonFilter);
+      });
+
+      const updatedTime = new Date(updatedAt);
+      const timeStr = `${updatedTime.getMonth()+1}/${updatedTime.getDate()} ${updatedTime.getHours()}:${String(updatedTime.getMinutes()).padStart(2,'0')} 기준`;
+
+      let html = `
+        <div class="marathon-header">
+          <span>🏅 국내 마라톤 대회</span>
+          <span class="marathon-header-sub">${timeStr}</span>
+        </div>
+        <div class="marathon-filters">
+          ${filters.map(f => `<button class="marathon-filter ${marathonFilter === f ? 'active' : ''}" onclick="setMarathonFilter('${f}')">${f}</button>`).join('')}
+        </div>
+      `;
+
+      if (filtered.length === 0) {
+        html += '<div class="marathon-empty"><h3>해당하는 대회가 없어요</h3><p>다른 필터를 선택해보세요</p></div>';
+      } else {
+        html += '<div class="marathon-list">';
+        for (const m of filtered) {
+          const dDayText = m.dDay === 0 ? 'D-DAY' : m.dDay > 0 ? `D-${m.dDay}` : `종료`;
+          const dDayClass = m.dDay <= 7 ? 'soon' : m.dDay <= 30 ? 'normal' : 'far';
+
+          const dateObj = new Date(m.date + 'T00:00:00+09:00');
+          const dayNames = ['일','월','화','수','목','금','토'];
+          const dateStr = `${dateObj.getMonth()+1}/${dateObj.getDate()}(${dayNames[dateObj.getDay()]})`;
+
+          const cardClick = m.detailLink ? `onclick="window.open('${m.detailLink}', '_blank')"` : '';
+          const cursorStyle = m.detailLink ? 'cursor:pointer;' : '';
+
+          html += `
+            <div class="marathon-card" ${cardClick} style="${cursorStyle}">
+              <div class="marathon-card-top">
+                <div class="marathon-card-name">${m.name}</div>
+                <span class="marathon-dday ${dDayClass}">${dDayText}</span>
+              </div>
+              <div class="marathon-card-info">
+                <span>📅 ${dateStr}</span>
+                ${m.place ? `<span>📍 ${m.place}</span>` : ''}
+              </div>
+              <div class="marathon-tags">
+                ${m.categories.map(c => `<span class="marathon-tag">${c}</span>`).join('')}
+                ${m.isOpen ? '<span class="marathon-tag open">접수중</span>' : ''}
+              </div>
+            </div>
+          `;
+        }
+        html += '</div>';
+      }
+
+      content.innerHTML = html;
+    }
+
+    function setMarathonFilter(f) {
+      marathonFilter = f;
+      renderMarathonUI();
     }
 
     function renderPenalties() {
