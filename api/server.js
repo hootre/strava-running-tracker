@@ -62,17 +62,25 @@ function getSettings(db) {
   return { ...DEFAULT_SETTINGS, ...(db.settings || {}) };
 }
 
-// 서버 사이드 현재 주 시작일 계산
+// 한국시간(KST, UTC+9) 기준 날짜 문자열
+function toKSTDateStr(d) {
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().split('T')[0];
+}
+
+// 서버 사이드 현재 주 시작일 계산 (KST 기준)
 function getCurrentWeekStartServer(date, settings) {
   const d = new Date(date);
-  const dateStr = d.toISOString().split('T')[0];
+  const dateStr = toKSTDateStr(d);
   if (dateStr >= settings.challengeStart && dateStr <= settings.firstWeekEnd) {
     return settings.challengeStart;
   }
-  const day = d.getDay();
+  // KST 기준 요일 계산
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  const day = kst.getUTCDay();
   const diff = day === 0 ? 6 : day - 1;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - diff);
+  const monday = new Date(kst);
+  monday.setUTCDate(kst.getUTCDate() - diff);
   return monday.toISOString().split('T')[0];
 }
 
@@ -83,23 +91,21 @@ function getWeekRanges(settings) {
   const ranges = [];
   ranges.push({ start: settings.challengeStart, end: settings.firstWeekEnd });
 
-  // firstWeekEnd 다음날부터 첫 번째 월요일 찾기
-  let cur = new Date(settings.firstWeekEnd + 'T00:00:00');
+  // firstWeekEnd 다음날부터 첫 번째 월요일 찾기 (KST 기준)
+  let cur = new Date(settings.firstWeekEnd + 'T00:00:00+09:00');
   cur.setDate(cur.getDate() + 1);
   while (cur.getDay() !== 1) cur.setDate(cur.getDate() + 1);
 
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  const challengeEnd = settings.challengeEnd
-    ? new Date(settings.challengeEnd + 'T23:59:59')
-    : null;
-  const cutoff = challengeEnd && challengeEnd < today ? challengeEnd : today;
+  const todayKST = toKSTDateStr(new Date());
+  const challengeEndStr = settings.challengeEnd || '2099-12-31';
+  const cutoffStr = challengeEndStr < todayKST ? challengeEndStr : todayKST;
 
-  while (cur <= cutoff) {
-    const start = cur.toISOString().split('T')[0];
+  while (true) {
+    const startStr = toKSTDateStr(cur);
+    if (startStr > cutoffStr) break;
     const end = new Date(cur);
     end.setDate(cur.getDate() + 6);
-    ranges.push({ start, end: end.toISOString().split('T')[0] });
+    ranges.push({ start: startStr, end: toKSTDateStr(end) });
     cur.setDate(cur.getDate() + 7);
   }
   return ranges;
@@ -273,7 +279,9 @@ app.get('/auth/callback', async (req, res) => {
         db.activities.push({ strava_id: athlete.id, activity_id: run.id, name: run.name,
           distance: run.distance, moving_time: run.moving_time,
           start_date: run.start_date, start_date_local: run.start_date_local,
-          type: run.type, sport_type: run.sport_type });
+          type: run.type, sport_type: run.sport_type,
+          start_latlng: run.start_latlng || null,
+          summary_polyline: run.map?.summary_polyline || null });
       }
       calculatePenalties(db, settings);
     } catch (syncErr) { console.error('Auto-sync error:', syncErr.message); }
@@ -477,7 +485,9 @@ app.post('/api/sync', async (req, res) => {
           strava_id: member.strava_id, activity_id: run.id, name: run.name,
           distance: run.distance, moving_time: run.moving_time,
           start_date: run.start_date, start_date_local: run.start_date_local,
-          type: run.type, sport_type: run.sport_type
+          type: run.type, sport_type: run.sport_type,
+          start_latlng: run.start_latlng || null,
+          summary_polyline: run.map?.summary_polyline || null
         });
       }
       results.push({ name: member.name, status: 'ok', synced: runs.length });
@@ -580,7 +590,9 @@ app.post('/api/admin/add-member', async (req, res) => {
           strava_id: athlete.id, activity_id: run.id, name: run.name,
           distance: run.distance, moving_time: run.moving_time,
           start_date: run.start_date, start_date_local: run.start_date_local,
-          type: run.type, sport_type: run.sport_type
+          type: run.type, sport_type: run.sport_type,
+          start_latlng: run.start_latlng || null,
+          summary_polyline: run.map?.summary_polyline || null
         });
       }
       calculatePenalties(db, settings);

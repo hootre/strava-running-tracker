@@ -10,6 +10,10 @@
   <link rel="apple-touch-icon" href="/icon-192.png">
   <meta name="apple-mobile-web-app-title" content="SM러닝크루">
   <title>SM러닝크루</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR97aA=" crossorigin=""/>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-WBkoXQa7zzL+UwxaTKZNSYu1OMkXP7b6qQlMHUdPQA=" crossorigin=""></script>
   <script>
     (function() {
       var ua = navigator.userAgent || '';
@@ -400,6 +404,166 @@
       background: rgba(252,76,2,0.15); color: var(--primary);
       padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
     }
+
+    /* ─── Map Tab ─── */
+    #mapContainer {
+      width: 100%;
+      height: calc(100vh - 56px - 64px - 40px - 48px); /* header - tabs - filter area - mode area */
+      border-radius: 0;
+    }
+    .map-filter {
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+    }
+    .map-filter::-webkit-scrollbar { display: none; }
+    .member-chip {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .member-chip.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+    .chip-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* ─── Map Modes ─── */
+    .map-modes {
+      display: flex;
+      gap: 6px;
+      padding: 12px 16px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .map-modes::-webkit-scrollbar { display: none; }
+    .mode-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mode-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+    .mode-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* ─── Territory Stat ─── */
+    .territory-stat {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 50;
+      color: var(--text);
+    }
+
+    /* ─── Ranking Panel ─── */
+    .ranking-panel {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      width: 280px;
+      max-height: calc(100vh - 200px);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow-y: auto;
+      z-index: 50;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .ranking-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      position: sticky;
+      top: 0;
+      background: var(--bg-card);
+    }
+    .ranking-list {
+      padding: 8px;
+    }
+    .ranking-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--bg);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ranking-item:hover {
+      background: var(--bg-hover);
+      border-color: var(--primary);
+    }
+    .ranking-item-rank {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .ranking-item-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .ranking-item-count {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .ranking-item-members {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -442,6 +606,10 @@
       <span class="tab-icon">&#x1F4B0;</span>
       <span>벌금</span>
     </button>
+    <button class="tab-item" onclick="switchTab('map')" data-tab="map">
+      <span class="tab-icon">🗺️</span>
+      <span>지도</span>
+    </button>
   </div>
 
   <!-- 기록 상세 모달 -->
@@ -461,19 +629,27 @@
     let calendarDate = new Date();
     let autoRefreshTimer = null;
 
+    // ── 로컬 날짜 문자열 (UTC 변환 방지, 한국시간 기준) ──
+    function toLocalDateStr(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    }
+
     // ── 주간 계산 (동적 설정 기반) ──
     function getCurrentWeekStart(date) {
       const settings = dashboardData?.settings || {};
       const cStart = settings.challengeStart || '2026-04-19';
       const fEnd   = settings.firstWeekEnd   || '2026-04-26';
       const d = new Date(date);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = toLocalDateStr(d);
       if (dateStr >= cStart && dateStr <= fEnd) return cStart;
       const day = d.getDay();
       const diff = day === 0 ? 6 : day - 1;
       const monday = new Date(d);
       monday.setDate(d.getDate() - diff);
-      return monday.toISOString().split('T')[0];
+      return toLocalDateStr(monday);
     }
 
     // ── 이번 달 km 계산 ──
@@ -648,6 +824,7 @@
         case 'dashboard': renderDashboard(); break;
         case 'calendar': renderCalendar(); break;
         case 'penalties': renderPenalties(); break;
+        case 'map': renderMap(); break;
       }
     }
 
@@ -912,6 +1089,573 @@
     }
 
     function changeMonth(d) { calendarDate.setMonth(calendarDate.getMonth() + d); renderCalendar(); }
+
+    // ── Polyline Decoder ──
+    function decodePolyline(encoded) {
+      const points = [];
+      let index = 0, lat = 0, lng = 0;
+      while (index < encoded.length) {
+        let b, shift = 0, result = 0;
+        do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+        lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+        shift = 0; result = 0;
+        do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+        lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+        points.push([lat / 1e5, lng / 1e5]);
+      }
+      return points;
+    }
+
+    // ── Map Tab ──
+    let mapInstance = null;
+    let mapMembers = {};
+    let mapVisibleMembers = new Set();
+    let mapMode = 'routes'; // 'routes', 'territory', 'overlap', 'ranking'
+    let mapLayers = { routes: [], territory: [], overlap: [], ranking: [] }; // Layer management
+    const memberColors = ['#FC4C02', '#3B82F6', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+
+    function setMapMode(mode) {
+      mapMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      renderMapContent();
+    }
+
+    // Grid utility for territory mode
+    function latlngToGridKey(lat, lng, cellSize = 500) {
+      // cellSize in meters; convert to approximate lat/lng
+      const metersPerDegLat = 111000;
+      const metersPerDegLng = Math.cos(lat * Math.PI / 180) * 111000;
+      const cellLat = cellSize / metersPerDegLat;
+      const cellLng = cellSize / metersPerDegLng;
+      const gridLat = Math.floor(lat / cellLat);
+      const gridLng = Math.floor(lng / cellLng);
+      return `${gridLat},${gridLng}`;
+    }
+
+    // Reverse grid key to lat/lng
+    function gridKeyToLatlng(key, cellSize = 500) {
+      const [gridLat, gridLng] = key.split(',').map(Number);
+      const metersPerDegLat = 111000;
+      const metersPerDegLng = 111000; // approximate
+      const cellLat = cellSize / metersPerDegLat;
+      const cellLng = cellSize / metersPerDegLng;
+      return [gridLat * cellLat, gridLng * cellLng];
+    }
+
+    // Get coordinates of grid cell bounds
+    function getGridCellBounds(key, cellSize = 500) {
+      const metersPerDegLat = 111000;
+      const metersPerDegLng = 111000;
+      const cellLat = cellSize / metersPerDegLat;
+      const cellLng = cellSize / metersPerDegLng;
+      const [gridLat, gridLng] = key.split(',').map(Number);
+      const north = (gridLat + 1) * cellLat;
+      const south = gridLat * cellLat;
+      const east = (gridLng + 1) * cellLng;
+      const west = gridLng * cellLng;
+      return [[south, west], [north, east]];
+    }
+
+    // Distance between two points (simplified)
+    function getDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371000; // Earth radius in meters
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // Find overlapping route segments
+    function findOverlapSegments(threshold = 200) {
+      const overlaps = [];
+      const { members } = dashboardData;
+      const visibleRuns = [];
+
+      // Collect all visible runs
+      members.forEach((member, memberIdx) => {
+        if (!mapVisibleMembers.has(member.strava_id)) return;
+        const allRuns = member.allRuns || member.activities || [];
+        allRuns.forEach(run => {
+          if (run.summary_polyline && run.start_latlng) {
+            visibleRuns.push({
+              points: decodePolyline(run.summary_polyline),
+              memberIdx,
+              memberName: member.name,
+              color: memberColors[memberIdx % memberColors.length],
+              runName: run.name
+            });
+          }
+        });
+      });
+
+      // Find overlapping segments
+      for (let i = 0; i < visibleRuns.length; i++) {
+        for (let j = i + 1; j < visibleRuns.length; j++) {
+          const run1 = visibleRuns[i];
+          const run2 = visibleRuns[j];
+
+          for (let p1 = 0; p1 < run1.points.length - 1; p1++) {
+            for (let p2 = 0; p2 < run2.points.length - 1; p2++) {
+              const [lat1, lng1] = run1.points[p1];
+              const [lat2, lng2] = run2.points[p2];
+              const dist = getDistance(lat1, lng1, lat2, lng2);
+
+              if (dist < threshold) {
+                // Found overlap, store segment
+                overlaps.push({
+                  point: [lat1, lng1],
+                  segment1: { start: run1.points[p1], end: run1.points[p1 + 1], ...run1 },
+                  segment2: { start: run2.points[p2], end: run2.points[p2 + 1], ...run2 },
+                  distance: dist
+                });
+              }
+            }
+          }
+        }
+      }
+
+      return overlaps;
+    }
+
+    // Get course rankings
+    function getCourseRankings(threshold = 500) {
+      const { members } = dashboardData;
+      const courses = {}; // { courseKey: { name, runs: [], members: Set } }
+
+      members.forEach((member, memberIdx) => {
+        if (!mapVisibleMembers.has(member.strava_id)) return;
+        const allRuns = member.allRuns || member.activities || [];
+        allRuns.forEach(run => {
+          if (run.start_latlng) {
+            const [startLat, startLng] = run.start_latlng;
+            // Find if this start location matches existing course
+            let courseKey = null;
+            for (const key in courses) {
+              const course = courses[key];
+              const [courseLat, courseLng] = course.center;
+              const dist = getDistance(startLat, startLng, courseLat, courseLng);
+              if (dist < threshold) {
+                courseKey = key;
+                break;
+              }
+            }
+
+            if (!courseKey) {
+              courseKey = `${startLat.toFixed(4)},${startLng.toFixed(4)}`;
+              courses[courseKey] = {
+                center: [startLat, startLng],
+                runs: [],
+                members: new Set(),
+                name: '' // Will compute later based on coordinates
+              };
+            }
+
+            courses[courseKey].runs.push(run);
+            courses[courseKey].members.add(member.name);
+          }
+        });
+      });
+
+      // Sort by run count
+      const sorted = Object.entries(courses)
+        .map(([key, course]) => ({
+          key,
+          ...course,
+          count: course.runs.length,
+          membersList: Array.from(course.members).join(', ')
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+
+      return sorted;
+    }
+
+    // Get location name from coordinates (simple approach)
+    function getLocationName(lat, lng) {
+      // Simple clustering - could use a reverse geocoding API
+      // For now, return grid-based name
+      return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+    }
+
+    function renderRoutesMode() {
+      // Default route visualization
+      if (mapLayers.routes.length > 0) {
+        mapLayers.routes.forEach(layer => mapInstance.removeLayer(layer));
+        mapLayers.routes = [];
+      }
+
+      const { members } = dashboardData;
+      const bounds = L.latLngBounds([]);
+      let hasRoutes = false;
+
+      members.forEach((member, memberIdx) => {
+        if (!mapVisibleMembers.has(member.strava_id)) return;
+        const color = memberColors[memberIdx % memberColors.length];
+        const allRuns = member.allRuns || member.activities || [];
+
+        allRuns.forEach(run => {
+          if (!run.summary_polyline || !run.start_latlng) return;
+          hasRoutes = true;
+
+          // Draw polyline
+          const points = decodePolyline(run.summary_polyline);
+          if (points.length > 0) {
+            const polyline = L.polyline(points, {
+              color: color,
+              weight: 3,
+              opacity: 0.8,
+              lineCap: 'round',
+              lineJoin: 'round'
+            }).addTo(mapInstance);
+            mapLayers.routes.push(polyline);
+            points.forEach(pt => bounds.extend(pt));
+          }
+
+          // Add start marker
+          const [startLat, startLng] = run.start_latlng;
+          if (startLat && startLng) {
+            const km = (run.distance / 1000).toFixed(2);
+            const dateStr = run.start_date_local.split('T')[0];
+            const marker = L.circleMarker([startLat, startLng], {
+              radius: 6,
+              fillColor: color,
+              color: '#ffffff',
+              weight: 2,
+              opacity: 1,
+              fillOpacity: 0.8
+            }).bindPopup(`
+              <div style="font-size:12px">
+                <strong>${member.name}</strong><br>
+                <strong>${run.name || '러닝'}</strong><br>
+                ${km}km<br>
+                ${dateStr}
+              </div>
+            `).addTo(mapInstance);
+            mapLayers.routes.push(marker);
+            bounds.extend([startLat, startLng]);
+          }
+        });
+      });
+
+      if (hasRoutes && bounds.isValid()) {
+        mapInstance.fitBounds(bounds, { padding: [50, 50] });
+      } else {
+        mapInstance.setView([37.5665, 126.9780], 13);
+      }
+    }
+
+    function renderTerritoryMode() {
+      if (mapLayers.territory.length > 0) {
+        mapLayers.territory.forEach(layer => mapInstance.removeLayer(layer));
+        mapLayers.territory = [];
+      }
+
+      const { members } = dashboardData;
+      const gridCells = {}; // { key: { count, coverage } }
+      const cellSize = 500; // 500 meters
+
+      // Collect all decoded points and build grid
+      members.forEach(member => {
+        if (!mapVisibleMembers.has(member.strava_id)) return;
+        const allRuns = member.allRuns || member.activities || [];
+
+        allRuns.forEach(run => {
+          if (!run.summary_polyline) return;
+          const points = decodePolyline(run.summary_polyline);
+
+          points.forEach(([lat, lng]) => {
+            const key = latlngToGridKey(lat, lng, cellSize);
+            if (!gridCells[key]) {
+              gridCells[key] = { count: 0, coverage: 0 };
+            }
+            gridCells[key].count += 1;
+          });
+        });
+      });
+
+      // Calculate coverage area
+      let totalCoveredCells = Object.keys(gridCells).length;
+      let totalArea = (totalCoveredCells * cellSize * cellSize) / 1000000; // km²
+
+      // Draw grid cells
+      const maxCount = Math.max(...Object.values(gridCells).map(c => c.count), 1);
+
+      Object.entries(gridCells).forEach(([key, cell]) => {
+        const bounds = getGridCellBounds(key, cellSize);
+        const opacity = 0.3 + (cell.count / maxCount) * 0.5; // 0.3 to 0.8
+        const hue = 15; // Orange
+        const saturation = Math.min(50 + (cell.count / maxCount) * 50, 100);
+        const lightness = Math.max(50 - (cell.count / maxCount) * 25, 25);
+        const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+
+        const rectangle = L.rectangle(bounds, {
+          color: color,
+          weight: 1,
+          opacity: 0.6,
+          fillColor: color,
+          fillOpacity: opacity
+        }).addTo(mapInstance);
+        mapLayers.territory.push(rectangle);
+      });
+
+      // Add stat overlay
+      const stat = L.control({ position: 'bottomleft' });
+      stat.onAdd = function(map) {
+        const div = L.DomUtil.create('div', 'territory-stat');
+        div.innerHTML = `<div>총 정복 영역</div><div style="font-size:18px;color:var(--primary);margin-top:4px">${totalArea.toFixed(2)} km²</div>`;
+        return div;
+      };
+      stat.addTo(mapInstance);
+      mapLayers.territory.push(stat);
+
+      mapInstance.setView([37.5665, 126.9780], 13);
+    }
+
+    function renderOverlapMode() {
+      if (mapLayers.overlap.length > 0) {
+        mapLayers.overlap.forEach(layer => {
+          if (layer.remove) mapInstance.removeLayer(layer);
+        });
+        mapLayers.overlap = [];
+      }
+
+      // First render all routes in a muted color
+      const { members } = dashboardData;
+      const bounds = L.latLngBounds([]);
+      let hasRoutes = false;
+
+      members.forEach((member, memberIdx) => {
+        if (!mapVisibleMembers.has(member.strava_id)) return;
+        const allRuns = member.allRuns || member.activities || [];
+
+        allRuns.forEach(run => {
+          if (!run.summary_polyline) return;
+          hasRoutes = true;
+          const points = decodePolyline(run.summary_polyline);
+          if (points.length > 0) {
+            const polyline = L.polyline(points, {
+              color: '#555555',
+              weight: 2,
+              opacity: 0.3,
+              lineCap: 'round',
+              lineJoin: 'round'
+            }).addTo(mapInstance);
+            mapLayers.overlap.push(polyline);
+            points.forEach(pt => bounds.extend(pt));
+          }
+        });
+      });
+
+      // Find and highlight overlaps
+      const overlaps = findOverlapSegments(200);
+      const overlapMap = {}; // Group by nearby overlaps
+
+      overlaps.forEach(overlap => {
+        const key = `${overlap.point[0].toFixed(4)},${overlap.point[1].toFixed(4)}`;
+        if (!overlapMap[key]) {
+          overlapMap[key] = [];
+        }
+        overlapMap[key].push(overlap);
+      });
+
+      // Draw overlap segments
+      Object.entries(overlapMap).forEach(([key, overlapGroup]) => {
+        const overlap = overlapGroup[0];
+        const members = new Set([overlap.segment1.memberName, overlap.segment2.memberName]);
+
+        const polyline = L.polyline([overlap.segment1.start, overlap.segment1.end], {
+          color: '#FFD700', // Gold
+          weight: 5,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).bindPopup(`
+          <div style="font-size:12px">
+            <strong>겹치는 코스</strong><br>
+            ${Array.from(members).join(', ')}<br>
+            ${overlap.segment1.runName || '러닝'}
+          </div>
+        `).addTo(mapInstance);
+        mapLayers.overlap.push(polyline);
+      });
+
+      if (hasRoutes && bounds.isValid()) {
+        mapInstance.fitBounds(bounds, { padding: [50, 50] });
+      } else {
+        mapInstance.setView([37.5665, 126.9780], 13);
+      }
+    }
+
+    function renderRankingMode() {
+      if (mapLayers.ranking.length > 0) {
+        mapLayers.ranking.forEach(layer => {
+          if (layer.remove) mapInstance.removeLayer(layer);
+        });
+        mapLayers.ranking = [];
+      }
+
+      // Render all routes in background
+      const { members } = dashboardData;
+      const bounds = L.latLngBounds([]);
+      let hasRoutes = false;
+
+      members.forEach((member, memberIdx) => {
+        if (!mapVisibleMembers.has(member.strava_id)) return;
+        const allRuns = member.allRuns || member.activities || [];
+
+        allRuns.forEach(run => {
+          if (!run.summary_polyline) return;
+          hasRoutes = true;
+          const points = decodePolyline(run.summary_polyline);
+          if (points.length > 0) {
+            const polyline = L.polyline(points, {
+              color: memberColors[memberIdx % memberColors.length],
+              weight: 2,
+              opacity: 0.3,
+              lineCap: 'round',
+              lineJoin: 'round'
+            }).addTo(mapInstance);
+            mapLayers.ranking.push(polyline);
+            points.forEach(pt => bounds.extend(pt));
+          }
+        });
+      });
+
+      // Get course rankings
+      const courses = getCourseRankings(500);
+
+      // Create ranking panel
+      const rankingHtml = courses.map((course, idx) => `
+        <div class="ranking-item" style="cursor:auto">
+          <div class="ranking-item-rank">${idx + 1}순위</div>
+          <div class="ranking-item-name">${getLocationName(course.center[0], course.center[1])}</div>
+          <div class="ranking-item-count">${course.count}회</div>
+          <div class="ranking-item-members">${course.membersList}</div>
+        </div>
+      `).join('');
+
+      // Create control
+      const control = L.control({ position: 'topright' });
+      control.onAdd = function(map) {
+        const div = L.DomUtil.create('div', 'ranking-panel');
+        div.innerHTML = `
+          <div class="ranking-header">코스 랭킹 TOP 10</div>
+          <div class="ranking-list">${rankingHtml}</div>
+        `;
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+      control.addTo(mapInstance);
+      mapLayers.ranking.push(control);
+
+      if (hasRoutes && bounds.isValid()) {
+        mapInstance.fitBounds(bounds, { padding: [50, 50] });
+      } else {
+        mapInstance.setView([37.5665, 126.9780], 13);
+      }
+    }
+
+    function renderMapContent() {
+      if (!mapInstance) return;
+
+      // Clear all layers except tiles
+      Object.values(mapLayers).forEach(layerArray => {
+        layerArray.forEach(layer => {
+          if (layer.remove) mapInstance.removeLayer(layer);
+        });
+      });
+      mapLayers = { routes: [], territory: [], overlap: [], ranking: [] };
+
+      switch (mapMode) {
+        case 'territory':
+          renderTerritoryMode();
+          break;
+        case 'overlap':
+          renderOverlapMode();
+          break;
+        case 'ranking':
+          renderRankingMode();
+          break;
+        default:
+          renderRoutesMode();
+      }
+    }
+
+    function renderMap() {
+      if (!dashboardData?.members.length) {
+        document.getElementById('content').innerHTML = '<div class="empty-state"><h3>참가자가 없어요</h3></div>';
+        return;
+      }
+
+      const { members } = dashboardData;
+      mapMode = 'routes'; // Reset to default mode
+
+      // Create filter UI with member chips
+      let filterHtml = '<div class="map-filter">';
+      members.forEach((m, idx) => {
+        const color = memberColors[idx % memberColors.length];
+        const isActive = !mapVisibleMembers.has(m.strava_id) || mapVisibleMembers.size === 0 ? true : mapVisibleMembers.has(m.strava_id);
+        filterHtml += `
+          <div class="member-chip ${isActive ? 'active' : ''}" onclick="toggleMapMember(${m.strava_id}, this)" data-strava-id="${m.strava_id}">
+            <div class="chip-color" style="background-color: ${color}"></div>
+            <span>${m.name}</span>
+          </div>`;
+      });
+      filterHtml += '</div>';
+
+      // Create mode toggle buttons
+      const modeHtml = `
+        <div class="map-modes">
+          <button class="mode-btn active" data-mode="routes" onclick="setMapMode('routes')">경로</button>
+          <button class="mode-btn" data-mode="territory" onclick="setMapMode('territory')">영역 정복</button>
+          <button class="mode-btn" data-mode="overlap" onclick="setMapMode('overlap')">겹치는 코스</button>
+          <button class="mode-btn" data-mode="ranking" onclick="setMapMode('ranking')">코스 랭킹</button>
+        </div>
+      `;
+
+      const contentDiv = document.getElementById('content');
+      contentDiv.innerHTML = filterHtml + modeHtml + '<div id="mapContainer"></div>';
+
+      // Initialize map on next tick
+      setTimeout(() => {
+        if (mapInstance) {
+          mapInstance.remove();
+        }
+
+        mapInstance = L.map('mapContainer').setView([37.5665, 126.9780], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(mapInstance);
+
+        // Initialize visible members set
+        if (mapVisibleMembers.size === 0) {
+          members.forEach(m => mapVisibleMembers.add(m.strava_id));
+        }
+
+        // Render initial routes mode
+        renderMapContent();
+      }, 0);
+    }
+
+    function toggleMapMember(stravaId, chipEl) {
+      if (mapVisibleMembers.has(stravaId)) {
+        mapVisibleMembers.delete(stravaId);
+        chipEl.classList.remove('active');
+      } else {
+        mapVisibleMembers.add(stravaId);
+        chipEl.classList.add('active');
+      }
+      // Re-render map content with current mode
+      renderMapContent();
+    }
 
     // ── Penalties Tab ──
     // 주차 번호 계산 (동적 설정 기반)
