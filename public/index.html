@@ -802,7 +802,14 @@
       // 이번 달 전체 크루 총 km
       const totalMonthlyKm = members.reduce((s, m) => s + (m.monthlyKm || 0), 0);
 
+      const currentWeekNum = getWeekNumber(ws);
+      const weekLabel = currentWeekNum ? `${currentWeekNum}주차` : '-';
+
       document.getElementById('statsBar').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">현재</div>
+          <div class="stat-value primary">${weekLabel}</div>
+        </div>
         <div class="stat-card">
           <div class="stat-label">참가자</div>
           <div class="stat-value">${connected}/${total}명</div>
@@ -1222,7 +1229,8 @@
     let activeProvince = null; // 현재 선택된 시도
 
     function setMapMode(mode) {
-      activeProvince = null; // 모드 변경 시 시도 선택 초기화
+      activeProvince = null;
+      activeCountry = null;
       mapMode = mode;
       document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === mode);
@@ -1355,10 +1363,12 @@
       renderMapContent();
     }
 
+    let activeCountry = null; // 현재 선택된 해외 국가
+
     function renderOverseasMode() {
       const { members } = dashboardData;
       const { overseas } = classifyRuns(members);
-      const countries = Object.keys(overseas);
+      const countries = Object.keys(overseas).sort((a, b) => overseas[b].length - overseas[a].length);
 
       if (countries.length === 0) {
         const control = L.control({ position: 'topright' });
@@ -1377,37 +1387,40 @@
         return;
       }
 
-      // 전체 해외 경로를 히트맵으로 그리기
-      const allOverseasRuns = Object.values(overseas).flat();
-      const bounds = drawHeatmapRoutes(allOverseasRuns, 'overseas');
+      // 선택된 국가의 데이터만 또는 전체
+      const displayRuns = activeCountry ? (overseas[activeCountry] || []) : Object.values(overseas).flat();
+      const bounds = drawHeatmapRoutes(displayRuns, 'overseas');
 
       // 국가별 요약 패널
-      const countryHtml = countries
-        .sort((a, b) => overseas[b].length - overseas[a].length)
-        .map(country => {
-          const runs = overseas[country];
-          const totalKm = runs.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
-          const memberSet = new Set(runs.map(e => e.member.name));
-          return `
-            <div class="region-item" onclick="(function(){
-              const pts = [${runs.map(e => `[${e.run.start_latlng[0]},${e.run.start_latlng[1]}]`).join(',')}];
-              if(pts.length && mapInstance) {
-                const b = L.latLngBounds(pts);
-                mapInstance.fitBounds(b, {padding:[50,50]});
-              }
-            })()">
-              <div class="region-name">${country}</div>
-              <div class="region-stats">${runs.length}회 · ${totalKm.toFixed(1)}km</div>
-              <div class="region-members">${Array.from(memberSet).join(', ')}</div>
-            </div>`;
-        }).join('');
+      const allRuns = Object.values(overseas).flat();
+      const allTotalKm = allRuns.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
+      const allActive = !activeCountry;
+
+      const countryHtml = countries.map(country => {
+        const runs = overseas[country];
+        const totalKm = runs.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
+        const memberSet = new Set(runs.map(e => e.member.name));
+        const isActive = activeCountry === country;
+        return `
+          <div class="region-item ${isActive ? 'active' : ''}" onclick="filterByCountry('${country.replace(/'/g, "\\'")}')">
+            <div class="region-name">${country}</div>
+            <div class="region-stats">${runs.length}회 · ${totalKm.toFixed(1)}km</div>
+            <div class="region-members">${Array.from(memberSet).join(', ')}</div>
+          </div>`;
+      }).join('');
 
       const control = L.control({ position: 'topright' });
       control.onAdd = function() {
         const div = L.DomUtil.create('div', 'region-panel');
         div.innerHTML = `
           <div class="region-header">🌍 해외 러닝 기록</div>
-          <div class="region-list">${countryHtml}</div>
+          <div class="region-list">
+            <div class="region-item ${allActive ? 'active' : ''}" onclick="filterByCountry(null)">
+              <div class="region-name">전체</div>
+              <div class="region-stats">${allRuns.length}회 · ${allTotalKm.toFixed(1)}km</div>
+            </div>
+            ${countryHtml}
+          </div>
         `;
         L.DomEvent.disableClickPropagation(div);
         L.DomEvent.disableScrollPropagation(div);
@@ -1416,11 +1429,17 @@
       control.addTo(mapInstance);
       mapLayers.overseas.push(control);
 
-      if (bounds.isValid()) {
+      if (displayRuns.length > 0 && bounds.isValid()) {
         mapInstance.fitBounds(bounds, { padding: [50, 50] });
       } else {
         mapInstance.setView([37.5665, 126.9780], 3);
       }
+    }
+
+    // 해외 국가 필터 클릭 핸들러
+    function filterByCountry(country) {
+      activeCountry = country;
+      renderMapContent();
     }
 
     function renderMapContent() {
