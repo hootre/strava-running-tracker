@@ -289,21 +289,16 @@
 
     /* ─── 데스크톱 반응형 ─── */
     @media (min-width: 768px) {
-      body { padding-bottom: 0; display: flex; flex-direction: column; }
-      .header { padding: 18px 32px; order: 1; }
+      body { padding-bottom: 0; }
+      .header { padding: 18px 32px; }
       .header-top { max-width: 1200px; margin: 0 auto; }
       .header h1 { font-size: 22px; }
-      .challenge-bar { order: 2; }
       .tab-bar {
         position: static; background: var(--bg); border-top: none;
         border-bottom: 1px solid var(--border);
         max-width: 1200px; margin: 0 auto; padding: 0 32px;
         gap: 4px; justify-content: flex-start;
-        order: 3; width: 100%;
       }
-      .stats-scroll { order: 4; }
-      .container { order: 5; }
-      .modal-overlay { order: 6; }
       .tab-item {
         flex: none; flex-direction: row; padding: 14px 20px; font-size: 14px;
         gap: 8px; border-bottom: 3px solid transparent; border-radius: 0;
@@ -323,6 +318,7 @@
       .penalty-section { margin: 0 0 20px; border-radius: 16px; }
       .penalty-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
       table { min-width: auto; }
+      #mapContainer { height: calc(100dvh - 56px - 50px - 50px - 48px); }
       .modal-overlay { align-items: center; }
       .modal-sheet { border-radius: 20px; max-width: 520px; max-height: 80vh; margin: 0 20px; }
     }
@@ -715,6 +711,19 @@
         }
       }
     }
+
+    // ── 데스크톱: 탭바를 헤더 아래로 이동 ──
+    function repositionTabBar() {
+      if (window.innerWidth >= 768) {
+        const tabBar = document.querySelector('.tab-bar');
+        const header = document.querySelector('.header');
+        if (tabBar && header && tabBar.nextElementSibling !== header) {
+          header.after(tabBar);
+        }
+      }
+    }
+    repositionTabBar();
+    window.addEventListener('resize', repositionTabBar);
 
     // ── Init ──
     async function init() {
