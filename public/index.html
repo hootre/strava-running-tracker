@@ -602,6 +602,136 @@
       font-size: 14px;
     }
 
+    /* ─── Marathon Modal ─── */
+    .marathon-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 9999;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      animation: fadeIn 0.2s;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .marathon-modal {
+      background: var(--bg-card);
+      width: 100%;
+      max-width: 480px;
+      max-height: 85vh;
+      border-radius: 20px 20px 0 0;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease-out;
+      position: relative;
+    }
+    @media (min-width: 768px) {
+      .marathon-overlay { align-items: center; }
+      .marathon-modal { border-radius: 20px; max-height: 80vh; }
+    }
+    .marathon-modal-handle {
+      width: 36px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 10px auto 0;
+    }
+    .marathon-modal-close {
+      position: absolute; top: 12px; right: 14px;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      border: none; color: var(--text-muted);
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .marathon-modal-close:hover { background: rgba(255,255,255,0.15); }
+    .marathon-modal-header {
+      padding: 20px 20px 0;
+    }
+    .marathon-modal-dday {
+      display: inline-block;
+      font-size: 12px; font-weight: 800;
+      padding: 3px 12px; border-radius: 12px;
+      margin-bottom: 10px;
+    }
+    .marathon-modal-title {
+      font-size: 20px; font-weight: 800;
+      color: var(--text); line-height: 1.35;
+      margin-bottom: 4px;
+    }
+    .marathon-modal-org {
+      font-size: 13px; color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .marathon-modal-body { padding: 0 20px 20px; }
+    .marathon-modal-section {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .marathon-modal-row {
+      display: flex;
+      align-items: flex-start;
+      padding: 7px 0;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .marathon-modal-row + .marathon-modal-row {
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .marathon-modal-label {
+      color: var(--text-muted);
+      min-width: 70px; flex-shrink: 0;
+      font-weight: 600;
+    }
+    .marathon-modal-value {
+      color: var(--text);
+      word-break: break-word;
+      line-height: 1.45;
+    }
+    .marathon-modal-desc {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .marathon-modal-section-title {
+      font-size: 12px; font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .marathon-modal-tags {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      margin-bottom: 14px; padding: 0 20px;
+    }
+    .marathon-modal-link {
+      display: block;
+      text-align: center;
+      padding: 14px;
+      margin: 0 20px 20px;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .marathon-modal-link:hover { opacity: 0.85; }
+    .marathon-modal-loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
     /* ─── Region Panel (국내 시도별 / 해외 국가별 공용) ─── */
     .region-panel {
       position: absolute;
@@ -1214,18 +1344,24 @@
         </div>
         <div class="member-list">`;
 
-      for (const m of sorted) {
+      for (let ci = 0; ci < sorted.length; ci++) {
+        const m = sorted[ci];
         const monthlyKm = m.monthlyKm || 0;
+        const isFirst = ci === 0;
+        const calId = `cal-detail-${ci}`;
         html += `
           <div class="member-card">
-            <div class="member-header">
+            <div class="member-header" onclick="toggleCalAccordion('${calId}', this)" style="cursor:pointer;">
               <span class="member-name">
                 ${m.profile ? `<img class="member-avatar" src="${m.profile}" alt="">` : ''}
                 ${m.name}
               </span>
-              <span class="monthly-badge">&#x1F4C5; ${monthlyKm}km</span>
+              <span style="display:flex;align-items:center;gap:8px;">
+                <span class="monthly-badge">&#x1F4C5; ${monthlyKm}km</span>
+                <span class="cal-chevron" style="font-size:12px;color:var(--text-muted);transition:transform 0.2s;display:inline-block;${isFirst ? 'transform:rotate(180deg);' : ''}"">▼</span>
+              </span>
             </div>
-            <div class="member-body" style="padding:0 16px 14px">
+            <div id="${calId}" class="member-body" style="padding:0 16px 14px;display:${isFirst ? 'block' : 'none'};">
               ${buildMiniCalendar(m, year, month)}
               <div class="calendar-legend">
                 <div class="legend-item"><div class="legend-dot" style="background:rgba(96,165,250,0.4);box-shadow:inset 0 0 0 1px rgba(96,165,250,0.6)"></div>10km+</div>
@@ -1240,6 +1376,19 @@
     }
 
     function changeMonth(d) { calendarDate.setMonth(calendarDate.getMonth() + d); renderCalendar(); }
+
+    function toggleCalAccordion(id, headerEl) {
+      const detail = document.getElementById(id);
+      if (!detail) return;
+      const chevron = headerEl.querySelector('.cal-chevron');
+      if (detail.style.display === 'none') {
+        detail.style.display = 'block';
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+      } else {
+        detail.style.display = 'none';
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+      }
+    }
 
     // ── Polyline Decoder ──
     function decodePolyline(encoded) {
@@ -1829,16 +1978,31 @@
       }
     }
 
+    let marathonFiltered = []; // 현재 필터된 마라톤 리스트 (모달용)
+    let marathonRegionFilter = '전체';
+
     function renderMarathonUI() {
       const content = document.getElementById('content');
       const { marathons, updatedAt } = marathonCache;
 
-      const filters = ['전체', '접수중', '풀', '하프', '10K'];
+      const filters = ['전체', '마감임박', '풀', '하프', '10K'];
+
+      // 지역 목록 동적 생성 (데이터에 존재하는 지역만)
+      const regionOrder = ['서울','경기','인천','부산','대구','대전','광주','울산','세종','강원','충북','충남','전북','전남','경북','경남','제주'];
+      const regionSet = new Set(marathons.map(m => m.region).filter(Boolean));
+      const regions = ['전체', ...regionOrder.filter(r => regionSet.has(r))];
+
       const filtered = marathons.filter(m => {
-        if (marathonFilter === '전체') return true;
-        if (marathonFilter === '접수중') return m.isOpen;
-        return m.categories.includes(marathonFilter);
+        // 종목 필터
+        let catPass = true;
+        if (marathonFilter === '마감임박') catPass = m.regDDay !== undefined && m.regDDay <= 7;
+        else if (marathonFilter !== '전체') catPass = m.categories.includes(marathonFilter);
+        // 지역 필터
+        let regionPass = true;
+        if (marathonRegionFilter !== '전체') regionPass = m.region === marathonRegionFilter;
+        return catPass && regionPass;
       });
+      marathonFiltered = filtered;
 
       const updatedTime = new Date(updatedAt);
       const timeStr = `${updatedTime.getMonth()+1}/${updatedTime.getDate()} ${updatedTime.getHours()}:${String(updatedTime.getMinutes()).padStart(2,'0')} 기준`;
@@ -1851,22 +2015,41 @@
         <div class="marathon-filters">
           ${filters.map(f => `<button class="marathon-filter ${marathonFilter === f ? 'active' : ''}" onclick="setMarathonFilter('${f}')">${f}</button>`).join('')}
         </div>
+        <div class="marathon-filters" style="padding-top:0;">
+          ${regions.map(r => `<button class="marathon-filter ${marathonRegionFilter === r ? 'active' : ''}" onclick="setMarathonRegion('${r}')">${r}</button>`).join('')}
+        </div>
       `;
 
       if (filtered.length === 0) {
         html += '<div class="marathon-empty"><h3>해당하는 대회가 없어요</h3><p>다른 필터를 선택해보세요</p></div>';
       } else {
         html += '<div class="marathon-list">';
-        for (const m of filtered) {
-          const dDayText = m.dDay === 0 ? 'D-DAY' : m.dDay > 0 ? `D-${m.dDay}` : `종료`;
-          const dDayClass = m.dDay <= 7 ? 'soon' : m.dDay <= 30 ? 'normal' : 'far';
+        for (let mi = 0; mi < filtered.length; mi++) {
+          const m = filtered[mi];
+
+          // 접수마감 D-day (regDDay가 있으면 접수마감 기준, 없으면 대회일 기준)
+          const hasRegDDay = m.regDDay !== undefined && m.regDDay !== null;
+          const displayDDay = hasRegDDay ? m.regDDay : m.dDay;
+          const dDayLabel = hasRegDDay ? '접수마감' : '대회';
+          const dDayText = displayDDay === 0 ? 'D-DAY' : displayDDay > 0 ? `D-${displayDDay}` : '마감';
+          const dDayClass = displayDDay <= 3 ? 'soon' : displayDDay <= 14 ? 'normal' : 'far';
 
           const dateObj = new Date(m.date + 'T00:00:00+09:00');
           const dayNames = ['일','월','화','수','목','금','토'];
           const dateStr = `${dateObj.getMonth()+1}/${dateObj.getDate()}(${dayNames[dateObj.getDay()]})`;
 
-          const cardClick = m.detailLink ? `onclick="window.open('${m.detailLink}', '_blank')"` : '';
-          const cursorStyle = m.detailLink ? 'cursor:pointer;' : '';
+          // 접수마감일 텍스트
+          let regEndStr = '';
+          if (m.regEndDate) {
+            const rObj = new Date(m.regEndDate + 'T00:00:00+09:00');
+            regEndStr = `${rObj.getMonth()+1}/${rObj.getDate()}(${dayNames[rObj.getDay()]}) 마감`;
+          }
+
+          // detailLink에서 no= 파라미터 추출
+          const noMatch = m.detailLink ? m.detailLink.match(/no=(\d+)/) : null;
+          const eventNo = noMatch ? noMatch[1] : '';
+          const cardClick = eventNo ? `onclick="openMarathonModal('${eventNo}', ${mi})"` : '';
+          const cursorStyle = eventNo ? 'cursor:pointer;' : '';
 
           html += `
             <div class="marathon-card" ${cardClick} style="${cursorStyle}">
@@ -1876,11 +2059,12 @@
               </div>
               <div class="marathon-card-info">
                 <span>📅 ${dateStr}</span>
-                ${m.place ? `<span>📍 ${m.place}</span>` : ''}
+                ${m.region ? `<span>📍 ${m.region}</span>` : ''}
+                ${regEndStr ? `<span>⏰ ${regEndStr}</span>` : ''}
               </div>
               <div class="marathon-tags">
                 ${m.categories.map(c => `<span class="marathon-tag">${c}</span>`).join('')}
-                ${m.isOpen ? '<span class="marathon-tag open">접수중</span>' : ''}
+                <span class="marathon-tag open">접수중</span>
               </div>
             </div>
           `;
@@ -1894,6 +2078,120 @@
     function setMarathonFilter(f) {
       marathonFilter = f;
       renderMarathonUI();
+    }
+
+    function setMarathonRegion(r) {
+      marathonRegionFilter = r;
+      renderMarathonUI();
+    }
+
+    async function openMarathonModal(eventNo, idx) {
+      const basicInfo = marathonFiltered[idx] || {};
+      // 모달 오버레이 생성 (로딩 상태)
+      const dDayText = basicInfo.dDay === 0 ? 'D-DAY' : basicInfo.dDay > 0 ? `D-${basicInfo.dDay}` : '종료';
+      const dDayClass = basicInfo.dDay <= 7 ? 'soon' : basicInfo.dDay <= 30 ? 'normal' : 'far';
+
+      const overlay = document.createElement('div');
+      overlay.className = 'marathon-overlay';
+      overlay.onclick = (e) => { if (e.target === overlay) closeMarathonModal(); };
+      overlay.innerHTML = `
+        <div class="marathon-modal">
+          <div class="marathon-modal-handle"></div>
+          <button class="marathon-modal-close" onclick="closeMarathonModal()">✕</button>
+          <div class="marathon-modal-header">
+            <span class="marathon-modal-dday ${dDayClass}">${dDayText}</span>
+            <div class="marathon-modal-title">${basicInfo.name}</div>
+          </div>
+          <div class="marathon-modal-loading">상세 정보를 불러오는 중...</div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      // ESC 키로 닫기
+      const escHandler = (e) => { if (e.key === 'Escape') closeMarathonModal(); };
+      document.addEventListener('keydown', escHandler);
+      overlay.dataset.escHandler = 'true';
+      overlay._escHandler = escHandler;
+
+      try {
+        const res = await fetch(`/api/marathon-detail?no=${eventNo}`);
+        if (!res.ok) throw new Error('API error');
+        const d = await res.json();
+
+        const modal = overlay.querySelector('.marathon-modal');
+        const dateObj = new Date(basicInfo.date + 'T00:00:00+09:00');
+        const dayNames = ['일','월','화','수','목','금','토'];
+        const dateStr = `${dateObj.getFullYear()}년 ${dateObj.getMonth()+1}월 ${dateObj.getDate()}일(${dayNames[dateObj.getDay()]})`;
+
+        modal.innerHTML = `
+          <div class="marathon-modal-handle"></div>
+          <button class="marathon-modal-close" onclick="closeMarathonModal()">✕</button>
+          <div class="marathon-modal-header">
+            <span class="marathon-modal-dday ${dDayClass}">${dDayText}</span>
+            <div class="marathon-modal-title">${d.name || basicInfo.name}</div>
+            ${d.organizer ? `<div class="marathon-modal-org">주최 · ${d.organizer}</div>` : ''}
+          </div>
+          <div class="marathon-modal-tags">
+            ${(basicInfo.categories || []).map(c => `<span class="marathon-tag">${c}</span>`).join('')}
+            ${basicInfo.isOpen ? '<span class="marathon-tag open">접수중</span>' : ''}
+          </div>
+          <div class="marathon-modal-body">
+            <div class="marathon-modal-section">
+              <div class="marathon-modal-section-title">대회 정보</div>
+              <div class="marathon-modal-row">
+                <span class="marathon-modal-label">📅 일시</span>
+                <span class="marathon-modal-value">${d.datetime || dateStr}</span>
+              </div>
+              <div class="marathon-modal-row">
+                <span class="marathon-modal-label">📍 장소</span>
+                <span class="marathon-modal-value">${d.place || basicInfo.place}${d.address ? `<br><span style="font-size:11px;color:var(--text-muted)">${d.address}</span>` : ''}</span>
+              </div>
+              ${d.region ? `<div class="marathon-modal-row">
+                <span class="marathon-modal-label">🗺️ 지역</span>
+                <span class="marathon-modal-value">${d.region}</span>
+              </div>` : ''}
+              ${d.categories ? `<div class="marathon-modal-row">
+                <span class="marathon-modal-label">🏃 종목</span>
+                <span class="marathon-modal-value">${d.categories}</span>
+              </div>` : ''}
+            </div>
+            <div class="marathon-modal-section">
+              <div class="marathon-modal-section-title">접수 안내</div>
+              ${d.registrationPeriod ? `<div class="marathon-modal-row">
+                <span class="marathon-modal-label">📝 접수기간</span>
+                <span class="marathon-modal-value">${d.registrationPeriod}</span>
+              </div>` : ''}
+              ${d.phone ? `<div class="marathon-modal-row">
+                <span class="marathon-modal-label">📞 연락처</span>
+                <span class="marathon-modal-value">${d.phone}</span>
+              </div>` : ''}
+              ${d.email ? `<div class="marathon-modal-row">
+                <span class="marathon-modal-label">✉️ 이메일</span>
+                <span class="marathon-modal-value">${d.email}</span>
+              </div>` : ''}
+            </div>
+            ${d.description ? `<div class="marathon-modal-section">
+              <div class="marathon-modal-section-title">상세 안내</div>
+              <div class="marathon-modal-desc">${d.description}</div>
+            </div>` : ''}
+          </div>
+          ${d.homepage ? `<a href="${d.homepage}" target="_blank" class="marathon-modal-link">🔗 공식 홈페이지 바로가기</a>` : ''}
+        `;
+      } catch (err) {
+        console.error('Marathon detail error:', err);
+        const loading = overlay.querySelector('.marathon-modal-loading');
+        if (loading) loading.innerHTML = '상세 정보를 불러올 수 없습니다.';
+      }
+    }
+
+    function closeMarathonModal() {
+      const overlay = document.querySelector('.marathon-overlay');
+      if (!overlay) return;
+      if (overlay._escHandler) document.removeEventListener('keydown', overlay._escHandler);
+      overlay.style.animation = 'none';
+      overlay.style.opacity = '0';
+      overlay.style.transition = 'opacity 0.15s';
+      setTimeout(() => overlay.remove(), 150);
     }
 
     function renderPenalties() {

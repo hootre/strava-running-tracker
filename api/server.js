@@ -736,8 +736,6 @@ app.get('/api/marathons', async (req, res) => {
         // 상세 링크
         const detailLink = `http://roadrun.co.kr/schedule/view.php?no=${eventNo}`;
 
-        const dDay = Math.ceil((eventDateObj - now) / (1000 * 60 * 60 * 24));
-
         marathons.push({
           name,
           date: eventDate,
@@ -745,7 +743,7 @@ app.get('/api/marathons', async (req, res) => {
           categories: categories.length > 0 ? categories : ['기타'],
           isOpen: true,
           detailLink,
-          dDay
+          eventNo
         });
       }
     } catch (fetchErr) {
@@ -763,10 +761,64 @@ app.get('/api/marathons', async (req, res) => {
       }
     }
 
-    // 날짜순 정렬
-    unique.sort((a, b) => a.date.localeCompare(b.date));
+    // 상세 페이지에서 접수마감일 + 지역 병렬 조회
+    const extractField = (h, label) => {
+      const li = h.indexOf(`>${label}</p>`);
+      if (li === -1) return '';
+      const after = h.substring(li);
+      const wi = after.indexOf('bgcolor="white"');
+      if (wi === -1) return '';
+      const aw = after.substring(wi);
+      const s = aw.indexOf('>');
+      const e = aw.indexOf('</td>');
+      if (s === -1 || e === -1) return '';
+      return aw.substring(s + 1, e).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    };
 
-    const result = { marathons: unique, updatedAt: new Date().toISOString() };
+    const BATCH = 20;
+    for (let i = 0; i < unique.length; i += BATCH) {
+      const batch = unique.slice(i, i + BATCH);
+      await Promise.all(batch.map(async (m) => {
+        try {
+          const r = await axios.get(`http://roadrun.co.kr/schedule/view.php?no=${m.eventNo}`, {
+            timeout: 8000,
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            responseType: 'arraybuffer'
+          });
+          const h = iconv.decode(Buffer.from(r.data), 'euc-kr');
+
+          // 지역
+          m.region = extractField(h, '대회지역') || '';
+
+          // 접수기간
+          const raw = extractField(h, '접수기간');
+          if (raw) {
+            m.registrationPeriod = raw;
+            const endMatch = raw.match(/~\s*(\d{4})년(\d{1,2})월(\d{1,2})일/);
+            if (endMatch) {
+              const endDate = new Date(`${endMatch[1]}-${String(endMatch[2]).padStart(2,'0')}-${String(endMatch[3]).padStart(2,'0')}T23:59:59+09:00`);
+              m.regEndDate = `${endMatch[1]}-${String(endMatch[2]).padStart(2,'0')}-${String(endMatch[3]).padStart(2,'0')}`;
+              m.regDDay = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+            }
+          }
+        } catch {}
+      }));
+    }
+
+    // 접수마감된 대회 제외 (regDDay < 0)
+    const open = unique.filter(m => !m.regDDay || m.regDDay >= 0);
+
+    // 대회일 D-day 계산
+    for (const m of open) {
+      const eventDateObj = new Date(m.date + 'T00:00:00+09:00');
+      m.dDay = Math.ceil((eventDateObj - now) / (1000 * 60 * 60 * 24));
+      delete m.eventNo; // 클라이언트에 불필요
+    }
+
+    // 날짜순 정렬
+    open.sort((a, b) => a.date.localeCompare(b.date));
+
+    const result = { marathons: open, updatedAt: new Date().toISOString() };
     marathonCache = { data: result, ts: Date.now() };
     res.json(result);
 
@@ -774,6 +826,82 @@ app.get('/api/marathons', async (req, res) => {
     console.error('Marathon API error:', err.message);
     if (marathonCache.data) return res.json(marathonCache.data);
     res.status(500).json({ error: '마라톤 정보를 불러올 수 없습니다' });
+  }
+});
+
+// ============================================================
+// API: 마라톤 대회 상세 정보
+// ============================================================
+app.get('/api/marathon-detail', async (req, res) => {
+  const { no } = req.query;
+  if (!no) return res.status(400).json({ error: 'no 파라미터 필요' });
+
+  try {
+    const resp = await axios.get(`http://roadrun.co.kr/schedule/view.php?no=${no}`, {
+      timeout: 10000,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      responseType: 'arraybuffer'
+    });
+    const html = iconv.decode(Buffer.from(resp.data), 'euc-kr');
+
+    const extract = (label) => {
+      const labelIdx = html.indexOf(`>${label}</p>`);
+      if (labelIdx === -1) return '';
+      const afterLabel = html.substring(labelIdx);
+      const whiteIdx = afterLabel.indexOf('bgcolor="white"');
+      if (whiteIdx === -1) return '';
+      const afterWhite = afterLabel.substring(whiteIdx);
+      const startTag = afterWhite.indexOf('>');
+      const endTag = afterWhite.indexOf('</td>');
+      if (startTag === -1 || endTag === -1) return '';
+      return afterWhite.substring(startTag + 1, endTag)
+        .replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    };
+
+    // 기타소개 (HTML 유지해서 줄바꿈 보존)
+    const descMatch = html.match(/기타소개<\/p>[\s\S]*?<td[^>]*bgcolor="white"[^>]*>\s*<p>([\s\S]*?)<\/p>\s*<\/td>/i);
+    let description = '';
+    if (descMatch) {
+      description = descMatch[1]
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&#\d+;/g, m => { try { return String.fromCodePoint(parseInt(m.slice(2,-1))); } catch { return m; } })
+        .trim();
+    }
+
+    // 홈페이지 URL 추출
+    const hpMatch = html.match(/홈페이지<\/p>[\s\S]*?<a href="([^"]+)"/i);
+    const homepage = hpMatch ? hpMatch[1] : '';
+
+    // 지도 좌표 추출
+    const coordMatch = html.match(/LatLng\(([\d.]+),\s*([\d.]+)\)/);
+    const lat = coordMatch ? parseFloat(coordMatch[1]) : null;
+    const lng = coordMatch ? parseFloat(coordMatch[2]) : null;
+
+    // 주소 추출 (infowindow content)
+    const addrMatch = html.match(/iw_inner[\s\S]*?'([^']+)'/);
+    const address = addrMatch ? addrMatch[1].trim() : '';
+
+    res.json({
+      name: extract('대회명'),
+      representative: extract('대표자명'),
+      email: extract('E-mail'),
+      datetime: extract('대회일시'),
+      phone: extract('전화번호'),
+      categories: extract('대회종목'),
+      region: extract('대회지역'),
+      place: extract('대회장소'),
+      organizer: extract('주최단체'),
+      registrationPeriod: extract('접수기간'),
+      homepage,
+      description,
+      address,
+      lat, lng
+    });
+  } catch (err) {
+    console.error('Marathon detail error:', err.message);
+    res.status(500).json({ error: '상세 정보를 불러올 수 없습니다' });
   }
 });
 
