@@ -677,41 +677,21 @@ app.get('/api/marathons', async (req, res) => {
     const year = now.getFullYear();
     const marathons = [];
 
-    // roadrun.co.kr 에서 접수중인 대회 가져오기 (EUC-KR 인코딩)
-    try {
-      const params = new URLSearchParams();
-      params.append('take_key', '접수중');
-      params.append('syear_key', String(year));
-
-      const resp = await axios.post('http://roadrun.co.kr/schedule/list.php', params.toString(), {
-        timeout: 15000,
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/x-www-form-urlencoded' },
-        responseType: 'arraybuffer'
-      });
-      const html = iconv.decode(Buffer.from(resp.data), 'euc-kr');
-
-      // 날짜+대회명+장소 패턴 파싱
-      const entryRegex = /<tr>\s*<td[^>]*>\s*<div[^>]*><b><font[^>]*>(\d{1,2})\/(\d{1,2})<\/font><\/b><br><font[^>]*>\((.)\)<\/font>/gi;
+    // roadrun.co.kr 리스트 파싱 헬퍼
+    function parseList(html, defaultStatus) {
       const blocks = html.split(/<!--리스트 시작-->/i);
       const listHtml = blocks.length > 1 ? blocks[1] : html;
-
-      // TR 블록 단위로 분할
-      const trBlocks = listHtml.split(/<tr>\s*<td[^>]*width="594"/i);
       const dataRows = listHtml.split(/<tr>\s*<td[^>]*width="18%"/i).slice(1);
 
       for (const row of dataRows) {
-        // 날짜
         const dateMatch = row.match(/<font[^>]*>(\d{1,2})\/(\d{1,2})<\/font>/);
         if (!dateMatch) continue;
         const month = parseInt(dateMatch[1]);
         const day = parseInt(dateMatch[2]);
         const eventDate = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         const eventDateObj = new Date(eventDate + 'T00:00:00+09:00');
-
-        // 이미 지난 대회 스킵
         if (eventDateObj < now) continue;
 
-        // 대회명 (view.php 링크의 텍스트)
         const nameMatch = row.match(/view\.php\?no=(\d+)[^>]*'>([^<]+)<\/a>/i)
           || row.match(/view\.php\?no=(\d+)[^>]*">([^<]+)<\/a>/i);
         if (!nameMatch) continue;
@@ -719,7 +699,6 @@ app.get('/api/marathons', async (req, res) => {
         const name = nameMatch[2].trim();
         if (!name || name.length < 3) continue;
 
-        // 종목 추출
         const catMatch = row.match(/color="#990000">(.*?)<\/font>/i)
           || row.match(/color=["']?#990000["']?>(.*?)<\/font>/i);
         const catText = catMatch ? catMatch[1] : '';
@@ -729,23 +708,26 @@ app.get('/api/marathons', async (req, res) => {
         if (/10k/i.test(catText)) categories.push('10K');
         if (/5k/i.test(catText)) categories.push('5K');
 
-        // 장소
         const placeMatch = row.match(/<td[^>]*width="19%"[^>]*>\s*<div[^>]*>([\s\S]*?)<\/div>/i);
         const place = placeMatch ? placeMatch[1].replace(/<[^>]*>/g, '').trim() : '';
-
-        // 상세 링크
         const detailLink = `http://roadrun.co.kr/schedule/view.php?no=${eventNo}`;
 
         marathons.push({
-          name,
-          date: eventDate,
-          place,
+          name, date: eventDate, place,
           categories: categories.length > 0 ? categories : ['기타'],
-          isOpen: true,
-          detailLink,
-          eventNo
+          status: defaultStatus,
+          detailLink, eventNo
         });
       }
+    }
+
+    // 전체 리스트 가져오기 (접수중 필터 시 접수예정도 포함됨)
+    try {
+      const resp = await axios.post('http://roadrun.co.kr/schedule/list.php',
+        new URLSearchParams({ syear_key: String(year) }).toString(),
+        { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/x-www-form-urlencoded' }, responseType: 'arraybuffer' });
+
+      parseList(iconv.decode(Buffer.from(resp.data), 'euc-kr'), 'open');
     } catch (fetchErr) {
       console.error('Marathon fetch error:', fetchErr.message);
     }
@@ -794,31 +776,40 @@ app.get('/api/marathons', async (req, res) => {
           const raw = extractField(h, '접수기간');
           if (raw) {
             m.registrationPeriod = raw;
+            // 접수 시작일 파싱
+            const startMatch = raw.match(/(\d{4})년(\d{1,2})월(\d{1,2})일\s*~/);
+            if (startMatch) {
+              const startDate = new Date(`${startMatch[1]}-${String(startMatch[2]).padStart(2,'0')}-${String(startMatch[3]).padStart(2,'0')}T00:00:00+09:00`);
+              m.regStartDate = `${startMatch[1]}-${String(startMatch[2]).padStart(2,'0')}-${String(startMatch[3]).padStart(2,'0')}`;
+              if (startDate > now) m.status = 'upcoming';
+            }
+            // 접수 마감일 파싱
             const endMatch = raw.match(/~\s*(\d{4})년(\d{1,2})월(\d{1,2})일/);
             if (endMatch) {
               const endDate = new Date(`${endMatch[1]}-${String(endMatch[2]).padStart(2,'0')}-${String(endMatch[3]).padStart(2,'0')}T23:59:59+09:00`);
               m.regEndDate = `${endMatch[1]}-${String(endMatch[2]).padStart(2,'0')}-${String(endMatch[3]).padStart(2,'0')}`;
               m.regDDay = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+              if (m.regDDay < 0) m.status = 'closed';
             }
           }
         } catch {}
       }));
     }
 
-    // 접수마감된 대회 제외 (regDDay < 0)
-    const open = unique.filter(m => !m.regDDay || m.regDDay >= 0);
+    // 접수마감(closed)된 대회 제외, 접수중+접수예정만
+    const filtered = unique.filter(m => m.status !== 'closed');
 
     // 대회일 D-day 계산
-    for (const m of open) {
+    for (const m of filtered) {
       const eventDateObj = new Date(m.date + 'T00:00:00+09:00');
       m.dDay = Math.ceil((eventDateObj - now) / (1000 * 60 * 60 * 24));
-      delete m.eventNo; // 클라이언트에 불필요
+      delete m.eventNo;
     }
 
     // 날짜순 정렬
-    open.sort((a, b) => a.date.localeCompare(b.date));
+    filtered.sort((a, b) => a.date.localeCompare(b.date));
 
-    const result = { marathons: open, updatedAt: new Date().toISOString() };
+    const result = { marathons: filtered, updatedAt: new Date().toISOString() };
     marathonCache = { data: result, ts: Date.now() };
     res.json(result);
 

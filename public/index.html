@@ -589,6 +589,10 @@
       background: rgba(34,197,94,0.15);
       color: #22C55E;
     }
+    .marathon-tag.upcoming {
+      background: rgba(59,130,246,0.15);
+      color: #3B82F6;
+    }
     .marathon-empty {
       text-align: center;
       padding: 60px 20px;
@@ -1357,24 +1361,26 @@
         </div>
         <div class="member-list">`;
 
+      const isMobile = window.innerWidth < 768;
       for (let ci = 0; ci < sorted.length; ci++) {
         const m = sorted[ci];
         const monthlyKm = m.calKm;
         const isFirst = ci === 0;
         const calId = `cal-detail-${ci}`;
+        const collapsed = isMobile && !isFirst;
         html += `
           <div class="member-card">
-            <div class="member-header" onclick="toggleCalAccordion('${calId}', this)" style="cursor:pointer;">
+            <div class="member-header" ${isMobile ? `onclick="toggleCalAccordion('${calId}', this)" style="cursor:pointer;"` : ''}>
               <span class="member-name">
                 ${m.profile ? `<img class="member-avatar" src="${m.profile}" alt="">` : ''}
                 ${m.name}
               </span>
               <span style="display:flex;align-items:center;gap:8px;">
                 <span class="monthly-badge">&#x1F4C5; ${monthlyKm}km</span>
-                <span class="cal-chevron" style="font-size:12px;color:var(--text-muted);transition:transform 0.2s;display:inline-block;${isFirst ? 'transform:rotate(180deg);' : ''}"">▼</span>
+                ${isMobile ? `<span class="cal-chevron" style="font-size:12px;color:var(--text-muted);transition:transform 0.2s;display:inline-block;${!collapsed ? 'transform:rotate(180deg);' : ''}">▼</span>` : ''}
               </span>
             </div>
-            <div id="${calId}" class="member-body" style="padding:0 16px 14px;display:${isFirst ? 'block' : 'none'};">
+            <div id="${calId}" class="member-body" style="padding:0 16px 14px;${collapsed ? 'display:none;' : ''}">
               ${buildMiniCalendar(m, year, month)}
               <div class="calendar-legend">
                 <div class="legend-item"><div class="legend-dot" style="background:rgba(96,165,250,0.4);box-shadow:inset 0 0 0 1px rgba(96,165,250,0.6)"></div>10km+</div>
@@ -1998,7 +2004,7 @@
       const content = document.getElementById('content');
       const { marathons, updatedAt } = marathonCache;
 
-      const filters = ['전체', '마감임박', '풀', '하프', '10K'];
+      const filters = ['전체', '마감임박', '접수예정', '풀', '하프', '10K'];
 
       // 지역 목록 동적 생성 (데이터에 존재하는 지역만)
       const regionOrder = ['서울','경기','인천','부산','대구','대전','광주','울산','세종','강원','충북','충남','전북','전남','경북','경남','제주'];
@@ -2006,9 +2012,10 @@
       const regions = ['전체', ...regionOrder.filter(r => regionSet.has(r))];
 
       const filtered = marathons.filter(m => {
-        // 종목 필터
+        // 종목/상태 필터
         let catPass = true;
-        if (marathonFilter === '마감임박') catPass = m.regDDay !== undefined && m.regDDay <= 7;
+        if (marathonFilter === '마감임박') catPass = m.status === 'open' && m.regDDay !== undefined && m.regDDay <= 7;
+        else if (marathonFilter === '접수예정') catPass = m.status === 'upcoming';
         else if (marathonFilter !== '전체') catPass = m.categories.includes(marathonFilter);
         // 지역 필터
         let regionPass = true;
@@ -2040,22 +2047,34 @@
         for (let mi = 0; mi < filtered.length; mi++) {
           const m = filtered[mi];
 
-          // 접수마감 D-day (regDDay가 있으면 접수마감 기준, 없으면 대회일 기준)
-          const hasRegDDay = m.regDDay !== undefined && m.regDDay !== null;
-          const displayDDay = hasRegDDay ? m.regDDay : m.dDay;
-          const dDayLabel = hasRegDDay ? '접수마감' : '대회';
-          const dDayText = displayDDay === 0 ? 'D-DAY' : displayDDay > 0 ? `D-${displayDDay}` : '마감';
-          const dDayClass = displayDDay <= 3 ? 'soon' : displayDDay <= 14 ? 'normal' : 'far';
+          const isUpcoming = m.status === 'upcoming';
+
+          // D-day: 접수중이면 접수마감 기준, 접수예정이면 접수시작 기준
+          let displayDDay, dDayText, dDayClass;
+          if (isUpcoming && m.regStartDate) {
+            const startObj = new Date(m.regStartDate + 'T00:00:00+09:00');
+            displayDDay = Math.ceil((startObj - new Date()) / (1000 * 60 * 60 * 24));
+            dDayText = displayDDay === 0 ? '오늘 오픈' : `접수 D-${displayDDay}`;
+            dDayClass = displayDDay <= 3 ? 'soon' : displayDDay <= 14 ? 'normal' : 'far';
+          } else {
+            const hasRegDDay = m.regDDay !== undefined && m.regDDay !== null;
+            displayDDay = hasRegDDay ? m.regDDay : m.dDay;
+            dDayText = displayDDay === 0 ? 'D-DAY' : displayDDay > 0 ? `D-${displayDDay}` : '마감';
+            dDayClass = displayDDay <= 3 ? 'soon' : displayDDay <= 14 ? 'normal' : 'far';
+          }
 
           const dateObj = new Date(m.date + 'T00:00:00+09:00');
           const dayNames = ['일','월','화','수','목','금','토'];
           const dateStr = `${dateObj.getMonth()+1}/${dateObj.getDate()}(${dayNames[dateObj.getDay()]})`;
 
-          // 접수마감일 텍스트
-          let regEndStr = '';
-          if (m.regEndDate) {
+          // 접수 관련 텍스트
+          let regInfoStr = '';
+          if (isUpcoming && m.regStartDate) {
+            const sObj = new Date(m.regStartDate + 'T00:00:00+09:00');
+            regInfoStr = `${sObj.getMonth()+1}/${sObj.getDate()}(${dayNames[sObj.getDay()]}) 접수 시작`;
+          } else if (m.regEndDate) {
             const rObj = new Date(m.regEndDate + 'T00:00:00+09:00');
-            regEndStr = `${rObj.getMonth()+1}/${rObj.getDate()}(${dayNames[rObj.getDay()]}) 마감`;
+            regInfoStr = `${rObj.getMonth()+1}/${rObj.getDate()}(${dayNames[rObj.getDay()]}) 마감`;
           }
 
           // detailLink에서 no= 파라미터 추출
@@ -2073,11 +2092,13 @@
               <div class="marathon-card-info">
                 <span>📅 ${dateStr}</span>
                 ${m.region ? `<span>📍 ${m.region}</span>` : ''}
-                ${regEndStr ? `<span>⏰ ${regEndStr}</span>` : ''}
+                ${regInfoStr ? `<span>⏰ ${regInfoStr}</span>` : ''}
               </div>
               <div class="marathon-tags">
                 ${m.categories.map(c => `<span class="marathon-tag">${c}</span>`).join('')}
-                <span class="marathon-tag open">접수중</span>
+                ${isUpcoming
+                  ? '<span class="marathon-tag upcoming">접수예정</span>'
+                  : '<span class="marathon-tag open">접수중</span>'}
               </div>
             </div>
           `;

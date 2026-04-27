@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sm-running-v23';
+const CACHE_NAME = 'sm-running-v24';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
