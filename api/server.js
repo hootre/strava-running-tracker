@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const iconv = require('iconv-lite');
 const { loadDB, saveDB, DEFAULT_SETTINGS } = require('../lib/db');
 const { exchangeToken, refreshAccessToken, getActivities } = require('../lib/strava');
 
@@ -672,82 +673,83 @@ app.get('/api/marathons', async (req, res) => {
       return res.json(marathonCache.data);
     }
 
-    // marathon.pe.kr 에서 대회 정보 가져오기
     const now = new Date();
     const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-
     const marathons = [];
 
-    // 현재 월부터 3개월치 가져오기
-    for (let i = 0; i < 3; i++) {
-      const m = month + i;
-      const y = m > 12 ? year + 1 : year;
-      const mo = m > 12 ? m - 12 : m;
+    // roadrun.co.kr 에서 접수중인 대회 가져오기 (EUC-KR 인코딩)
+    try {
+      const params = new URLSearchParams();
+      params.append('take_key', '접수중');
+      params.append('syear_key', String(year));
 
-      try {
-        const url = `http://marathon.pe.kr/schedule_index.php?year=${y}&month=${mo}`;
-        const resp = await axios.get(url, {
-          timeout: 10000,
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          responseType: 'text'
+      const resp = await axios.post('http://roadrun.co.kr/schedule/list.php', params.toString(), {
+        timeout: 15000,
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/x-www-form-urlencoded' },
+        responseType: 'arraybuffer'
+      });
+      const html = iconv.decode(Buffer.from(resp.data), 'euc-kr');
+
+      // 날짜+대회명+장소 패턴 파싱
+      const entryRegex = /<tr>\s*<td[^>]*>\s*<div[^>]*><b><font[^>]*>(\d{1,2})\/(\d{1,2})<\/font><\/b><br><font[^>]*>\((.)\)<\/font>/gi;
+      const blocks = html.split(/<!--리스트 시작-->/i);
+      const listHtml = blocks.length > 1 ? blocks[1] : html;
+
+      // TR 블록 단위로 분할
+      const trBlocks = listHtml.split(/<tr>\s*<td[^>]*width="594"/i);
+      const dataRows = listHtml.split(/<tr>\s*<td[^>]*width="18%"/i).slice(1);
+
+      for (const row of dataRows) {
+        // 날짜
+        const dateMatch = row.match(/<font[^>]*>(\d{1,2})\/(\d{1,2})<\/font>/);
+        if (!dateMatch) continue;
+        const month = parseInt(dateMatch[1]);
+        const day = parseInt(dateMatch[2]);
+        const eventDate = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const eventDateObj = new Date(eventDate + 'T00:00:00+09:00');
+
+        // 이미 지난 대회 스킵
+        if (eventDateObj < now) continue;
+
+        // 대회명 (view.php 링크의 텍스트)
+        const nameMatch = row.match(/view\.php\?no=(\d+)[^>]*'>([^<]+)<\/a>/i)
+          || row.match(/view\.php\?no=(\d+)[^>]*">([^<]+)<\/a>/i);
+        if (!nameMatch) continue;
+        const eventNo = nameMatch[1];
+        const name = nameMatch[2].trim();
+        if (!name || name.length < 3) continue;
+
+        // 종목 추출
+        const catMatch = row.match(/color="#990000">(.*?)<\/font>/i)
+          || row.match(/color=["']?#990000["']?>(.*?)<\/font>/i);
+        const catText = catMatch ? catMatch[1] : '';
+        const categories = [];
+        if (/풀|full|42\.195|42k/i.test(catText)) categories.push('풀');
+        if (/하프|half|21k/i.test(catText)) categories.push('하프');
+        if (/10k/i.test(catText)) categories.push('10K');
+        if (/5k/i.test(catText)) categories.push('5K');
+
+        // 장소
+        const placeMatch = row.match(/<td[^>]*width="19%"[^>]*>\s*<div[^>]*>([\s\S]*?)<\/div>/i);
+        const place = placeMatch ? placeMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+
+        // 상세 링크
+        const detailLink = `http://roadrun.co.kr/schedule/view.php?no=${eventNo}`;
+
+        const dDay = Math.ceil((eventDateObj - now) / (1000 * 60 * 60 * 24));
+
+        marathons.push({
+          name,
+          date: eventDate,
+          place,
+          categories: categories.length > 0 ? categories : ['기타'],
+          isOpen: true,
+          detailLink,
+          dDay
         });
-
-        const html = resp.data;
-
-        // 정규식으로 대회 정보 파싱
-        // marathon.pe.kr은 테이블 기반 레이아웃
-        const rowRegex = /<tr[^>]*>[\s\S]*?<\/tr>/gi;
-        const rows = html.match(rowRegex) || [];
-
-        for (const row of rows) {
-          // 날짜 추출
-          const dateMatch = row.match(/(\d{4})-(\d{2})-(\d{2})/);
-          if (!dateMatch) continue;
-
-          const eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
-          const eventDateObj = new Date(eventDate + 'T00:00:00+09:00');
-
-          // 이미 지난 대회 스킵
-          if (eventDateObj < now) continue;
-
-          // 대회명 추출 (링크 텍스트)
-          const nameMatch = row.match(/<a[^>]*>(.*?)<\/a>/i);
-          if (!nameMatch) continue;
-          let name = nameMatch[1].replace(/<[^>]*>/g, '').trim();
-          if (!name || name.length < 3) continue;
-
-          // 접수 링크 추출
-          const linkMatch = row.match(/href="([^"]*schedule_view[^"]*)"/i);
-          const detailLink = linkMatch ? `http://marathon.pe.kr/${linkMatch[1]}` : null;
-
-          // 접수중 여부 확인 (접수중, 접수마감 텍스트)
-          const isOpen = /접수중|접수 중|모집중|신청/.test(row) && !/접수마감|마감/.test(row);
-
-          // 장소 추출
-          const placeMatch = row.match(/(?:장소|코스)[:\s]*([^<]+)/i);
-          const place = placeMatch ? placeMatch[1].trim() : '';
-
-          // 종목 추출 (풀, 하프, 10km, 5km 등)
-          const categories = [];
-          if (/풀|full|42/i.test(row)) categories.push('풀');
-          if (/하프|half|21/i.test(row)) categories.push('하프');
-          if (/10k/i.test(row)) categories.push('10K');
-          if (/5k/i.test(row)) categories.push('5K');
-
-          marathons.push({
-            name,
-            date: eventDate,
-            place,
-            categories: categories.length > 0 ? categories : ['미정'],
-            isOpen,
-            detailLink,
-            dDay: Math.ceil((eventDateObj - now) / (1000 * 60 * 60 * 24))
-          });
-        }
-      } catch (fetchErr) {
-        console.error(`Marathon fetch error (${y}-${mo}):`, fetchErr.message);
       }
+    } catch (fetchErr) {
+      console.error('Marathon fetch error:', fetchErr.message);
     }
 
     // 중복 제거 (이름+날짜 기준)
@@ -770,7 +772,6 @@ app.get('/api/marathons', async (req, res) => {
 
   } catch (err) {
     console.error('Marathon API error:', err.message);
-    // 캐시가 있으면 만료되어도 반환
     if (marathonCache.data) return res.json(marathonCache.data);
     res.status(500).json({ error: '마라톤 정보를 불러올 수 없습니다' });
   }
