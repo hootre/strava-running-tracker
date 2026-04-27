@@ -1664,15 +1664,37 @@
 
         try {
           mapInstance = L.map('mapContainer').setView([37.5665, 126.9780], 13);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap',
-            maxZoom: 19
+          // CartoDB Dark Matter - 2D 미니멀 다크 스타일
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© CartoDB © OpenStreetMap',
+            maxZoom: 19,
+            subdomains: 'abcd'
           }).addTo(mapInstance);
+
+          // 경로 데이터 유무 확인
+          const hasPolyline = members.some(m =>
+            (m.allRuns || m.activities || []).some(r => r.summary_polyline)
+          );
+          console.log('[Map] 경로 데이터 존재:', hasPolyline,
+            '멤버수:', members.length,
+            '총 러닝수:', members.reduce((s,m) => s + (m.allRuns||m.activities||[]).length, 0));
 
           setTimeout(() => {
             if (mapInstance) {
               mapInstance.invalidateSize();
               renderMapContent();
+
+              // 경로 데이터가 없으면 안내
+              if (!hasPolyline) {
+                const info = L.control({ position: 'topright' });
+                info.onAdd = function() {
+                  const div = L.DomUtil.create('div');
+                  div.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);font-size:13px;max-width:220px;';
+                  div.innerHTML = '⚠️ 경로 데이터가 없습니다.<br><br>상단 <b>🔄 동기화</b> 버튼을 눌러 Strava에서 경로 데이터를 다시 받아주세요.';
+                  return div;
+                };
+                info.addTo(mapInstance);
+              }
             }
           }, 200);
         } catch(e) {
