@@ -1286,28 +1286,6 @@
         const dateStr = entry.run.start_date_local ? entry.run.start_date_local.split('T')[0] : '';
         core.bindPopup(`<div style="font-size:12px"><strong>${entry.member.name}</strong><br><strong>${entry.run.name || '러닝'}</strong><br>${km}km · ${dateStr}</div>`);
       });
-      // 출발점 마커 (겹치는 출발점 묶기)
-      const startPoints = {};
-      runs.forEach(entry => {
-        const [lat, lng] = entry.run.start_latlng || [];
-        if (!lat || !lng) return;
-        const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
-        if (!startPoints[key]) startPoints[key] = { lat, lng, runs: [] };
-        startPoints[key].runs.push(entry);
-      });
-      Object.values(startPoints).forEach(sp => {
-        const count = sp.runs.length;
-        const radius = Math.min(4 + count, 10);
-        const popupHtml = sp.runs.map(e => {
-          const km = (e.run.distance / 1000).toFixed(2);
-          return `<span style="color:${e.color}">●</span> ${e.member.name} — ${km}km`;
-        }).join('<br>');
-        const marker = L.circleMarker([sp.lat, sp.lng], {
-          radius, fillColor: sp.runs[0].color,
-          color: 'rgba(255,255,255,0.6)', weight: 1.5, opacity: 0.9, fillOpacity: 0.7
-        }).bindPopup(`<div style="font-size:12px">${popupHtml}</div>`).addTo(mapInstance);
-        mapLayers[layerKey].push(marker);
-      });
       return bounds;
     }
 
