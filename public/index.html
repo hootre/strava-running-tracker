@@ -487,62 +487,76 @@
       transform: scale(0.96);
     }
 
-    /* ─── Overseas Panel ─── */
-    .overseas-panel {
+    /* ─── Region Panel (국내 시도별 / 해외 국가별 공용) ─── */
+    .region-panel {
       position: absolute;
-      right: 20px;
-      top: 20px;
-      width: 280px;
-      max-height: calc(100vh - 200px);
+      right: 10px;
+      top: 10px;
+      width: 240px;
+      max-height: calc(100vh - 220px);
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 14px;
       overflow-y: auto;
       z-index: 50;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      scrollbar-width: thin;
     }
-    .overseas-header {
-      padding: 16px;
+    .region-panel::-webkit-scrollbar { width: 4px; }
+    .region-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .region-header {
+      padding: 14px 16px;
       border-bottom: 1px solid var(--border);
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       color: var(--text);
       position: sticky;
       top: 0;
       background: var(--bg-card);
+      border-radius: 14px 14px 0 0;
+      z-index: 1;
     }
-    .overseas-list {
-      padding: 8px;
-    }
-    .overseas-country {
-      padding: 12px;
-      margin-bottom: 8px;
+    .region-list { padding: 8px; }
+    .region-item {
+      padding: 10px 12px;
+      margin-bottom: 6px;
       background: var(--bg);
       border-radius: 10px;
       border: 1px solid var(--border);
       cursor: pointer;
       transition: all 0.2s;
     }
-    .overseas-country:hover {
+    .region-item:hover {
       background: var(--bg-hover);
       border-color: var(--primary);
     }
-    .overseas-country-name {
-      font-size: 14px;
+    .region-item.active {
+      border-color: var(--primary);
+      background: rgba(252, 76, 2, 0.1);
+    }
+    .region-name {
+      font-size: 13px;
       font-weight: 700;
       color: var(--text);
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
-    .overseas-country-stats {
-      font-size: 14px;
+    .region-stats {
+      font-size: 13px;
       font-weight: 800;
       color: var(--primary);
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
-    .overseas-country-members {
+    .region-members {
       font-size: 11px;
       color: var(--text-muted);
       line-height: 1.4;
+    }
+    @media (max-width: 767px) {
+      .region-panel { width: 180px; right: 6px; top: 6px; max-height: calc(100vh - 260px); }
+      .region-header { padding: 10px 12px; font-size: 12px; }
+      .region-item { padding: 8px 10px; }
+      .region-name { font-size: 12px; }
+      .region-stats { font-size: 12px; }
     }
   </style>
 </head>
@@ -1166,7 +1180,49 @@
       return `기타 (${lat.toFixed(1)}, ${lng.toFixed(1)})`;
     }
 
+    // 좌표로 한국 시/도 판별
+    function getProvinceByCoords(lat, lng) {
+      // 광역시/특별시 (좁은 범위 먼저 체크)
+      if (lat >= 37.43 && lat <= 37.70 && lng >= 126.76 && lng <= 127.18) return '서울';
+      if (lat >= 37.35 && lat <= 37.56 && lng >= 126.55 && lng <= 126.78) return '인천';
+      if (lat >= 35.05 && lat <= 35.24 && lng >= 128.85 && lng <= 129.25) return '부산';
+      if (lat >= 35.78 && lat <= 35.95 && lng >= 128.48 && lng <= 128.76) return '대구';
+      if (lat >= 35.08 && lat <= 35.22 && lng >= 126.75 && lng <= 127.00) return '광주';
+      if (lat >= 36.27 && lat <= 36.43 && lng >= 127.30 && lng <= 127.50) return '대전';
+      if (lat >= 35.48 && lat <= 35.62 && lng >= 129.25 && lng <= 129.45) return '울산';
+      if (lat >= 36.88 && lat <= 37.08 && lng >= 127.00 && lng <= 127.25) return '세종';
+      // 제주 (섬이라 명확)
+      if (lat >= 33.10 && lat <= 33.60 && lng >= 126.10 && lng <= 126.98) return '제주';
+      // 도 단위 (넓은 범위)
+      if (lat >= 37.60 && lat <= 38.30 && lng >= 126.60 && lng <= 127.85) return '경기 북부';
+      if (lat >= 37.10 && lat <= 37.60 && lng >= 126.60 && lng <= 127.60) return '경기 남부';
+      if (lat >= 37.05 && lat <= 38.60 && lng >= 127.60 && lng <= 129.40) return '강원';
+      if (lat >= 36.40 && lat <= 37.10 && lng >= 126.60 && lng <= 127.65) return '충남';
+      if (lat >= 36.40 && lat <= 37.10 && lng >= 127.65 && lng <= 128.65) return '충북';
+      if (lat >= 35.40 && lat <= 36.40 && lng >= 126.30 && lng <= 127.30) return '전북';
+      if (lat >= 34.20 && lat <= 35.40 && lng >= 126.00 && lng <= 127.40) return '전남';
+      if (lat >= 35.60 && lat <= 36.40 && lng >= 127.80 && lng <= 129.20) return '경북';
+      if (lat >= 34.80 && lat <= 35.60 && lng >= 127.50 && lng <= 129.30) return '경남';
+      return '기타';
+    }
+
+    // 한국 러닝을 시도별로 분류
+    function classifyKoreaByProvince(koreaRuns) {
+      const provinces = {};
+      koreaRuns.forEach(entry => {
+        const [lat, lng] = entry.run.start_latlng || [];
+        if (!lat || !lng) return;
+        const province = getProvinceByCoords(lat, lng);
+        if (!provinces[province]) provinces[province] = [];
+        provinces[province].push(entry);
+      });
+      return provinces;
+    }
+
+    let activeProvince = null; // 현재 선택된 시도
+
     function setMapMode(mode) {
+      activeProvince = null; // 모드 변경 시 시도 선택 초기화
       mapMode = mode;
       document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === mode);
@@ -1188,56 +1244,38 @@
       return R * c;
     }
 
-    function renderRoutesMode() {
-      const { members } = dashboardData;
-      const { korea } = classifyRuns(members);
+    // 히트맵 스타일로 경로 그리기 (공용)
+    function drawHeatmapRoutes(runs, layerKey) {
       const bounds = L.latLngBounds([]);
-
-      // 히트맵 스타일: 넓은 글로우 → 중간 → 얇은 코어 3겹으로 겹칠수록 밝아지는 효과
-      korea.forEach(entry => {
+      runs.forEach(entry => {
         if (entry.points.length === 0) return;
         entry.points.forEach(pt => bounds.extend(pt));
-
-        // Layer 1: Wide glow (넓은 배경광)
+        // 3겹 히트맵: glow → mid → core
         const glow = L.polyline(entry.points, {
-          color: entry.color, weight: 10, opacity: 0.08,
-          lineCap: 'round', lineJoin: 'round'
+          color: entry.color, weight: 10, opacity: 0.08, lineCap: 'round', lineJoin: 'round'
         }).addTo(mapInstance);
-        mapLayers.routes.push(glow);
-
-        // Layer 2: Mid glow (중간 광택)
+        mapLayers[layerKey].push(glow);
         const mid = L.polyline(entry.points, {
-          color: entry.color, weight: 5, opacity: 0.15,
-          lineCap: 'round', lineJoin: 'round'
+          color: entry.color, weight: 5, opacity: 0.15, lineCap: 'round', lineJoin: 'round'
         }).addTo(mapInstance);
-        mapLayers.routes.push(mid);
-
-        // Layer 3: Core line (코어 라인)
+        mapLayers[layerKey].push(mid);
         const core = L.polyline(entry.points, {
-          color: entry.color, weight: 2, opacity: 0.5,
-          lineCap: 'round', lineJoin: 'round'
+          color: entry.color, weight: 2, opacity: 0.5, lineCap: 'round', lineJoin: 'round'
         }).addTo(mapInstance);
-        mapLayers.routes.push(core);
-
-        // 클릭 시 상세 팝업 (코어 라인에만)
+        mapLayers[layerKey].push(core);
         const km = (entry.run.distance / 1000).toFixed(2);
         const dateStr = entry.run.start_date_local ? entry.run.start_date_local.split('T')[0] : '';
         core.bindPopup(`<div style="font-size:12px"><strong>${entry.member.name}</strong><br><strong>${entry.run.name || '러닝'}</strong><br>${km}km · ${dateStr}</div>`);
       });
-
-      // 출발점 마커 (겹치는 출발점은 하나로 묶어서 깔끔하게)
+      // 출발점 마커 (겹치는 출발점 묶기)
       const startPoints = {};
-      korea.forEach(entry => {
+      runs.forEach(entry => {
         const [lat, lng] = entry.run.start_latlng || [];
         if (!lat || !lng) return;
         const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
-        if (!startPoints[key]) {
-          startPoints[key] = { lat, lng, runs: [], colors: new Set() };
-        }
+        if (!startPoints[key]) startPoints[key] = { lat, lng, runs: [] };
         startPoints[key].runs.push(entry);
-        startPoints[key].colors.add(entry.color);
       });
-
       Object.values(startPoints).forEach(sp => {
         const count = sp.runs.length;
         const radius = Math.min(4 + count, 10);
@@ -1245,20 +1283,76 @@
           const km = (e.run.distance / 1000).toFixed(2);
           return `<span style="color:${e.color}">●</span> ${e.member.name} — ${km}km`;
         }).join('<br>');
-
         const marker = L.circleMarker([sp.lat, sp.lng], {
           radius, fillColor: sp.runs[0].color,
-          color: 'rgba(255,255,255,0.6)', weight: 1.5,
-          opacity: 0.9, fillOpacity: 0.7
+          color: 'rgba(255,255,255,0.6)', weight: 1.5, opacity: 0.9, fillOpacity: 0.7
         }).bindPopup(`<div style="font-size:12px">${popupHtml}</div>`).addTo(mapInstance);
-        mapLayers.routes.push(marker);
+        mapLayers[layerKey].push(marker);
       });
+      return bounds;
+    }
 
-      if (korea.length > 0 && bounds.isValid()) {
+    function renderRoutesMode() {
+      const { members } = dashboardData;
+      const { korea } = classifyRuns(members);
+      const provinces = classifyKoreaByProvince(korea);
+      const provinceNames = Object.keys(provinces).sort((a, b) => provinces[b].length - provinces[a].length);
+
+      // 선택된 시도의 데이터만 또는 전체
+      const displayRuns = activeProvince ? (provinces[activeProvince] || []) : korea;
+      const bounds = drawHeatmapRoutes(displayRuns, 'routes');
+
+      // 시도별 패널 (기록이 있는 시도만)
+      if (provinceNames.length > 0) {
+        const provinceHtml = provinceNames.map(name => {
+          const runs = provinces[name];
+          const totalKm = runs.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
+          const memberSet = new Set(runs.map(e => e.member.name));
+          const isActive = activeProvince === name;
+          return `
+            <div class="region-item ${isActive ? 'active' : ''}" onclick="filterByProvince('${name}')">
+              <div class="region-name">${name}</div>
+              <div class="region-stats">${runs.length}회 · ${totalKm.toFixed(1)}km</div>
+              <div class="region-members">${Array.from(memberSet).join(', ')}</div>
+            </div>`;
+        }).join('');
+
+        const allActive = !activeProvince;
+        const totalRuns = korea.length;
+        const totalKm = korea.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
+
+        const control = L.control({ position: 'topright' });
+        control.onAdd = function() {
+          const div = L.DomUtil.create('div', 'region-panel');
+          div.innerHTML = `
+            <div class="region-header">🇰🇷 지역별 러닝</div>
+            <div class="region-list">
+              <div class="region-item ${allActive ? 'active' : ''}" onclick="filterByProvince(null)">
+                <div class="region-name">전체</div>
+                <div class="region-stats">${totalRuns}회 · ${totalKm.toFixed(1)}km</div>
+              </div>
+              ${provinceHtml}
+            </div>
+          `;
+          L.DomEvent.disableClickPropagation(div);
+          L.DomEvent.disableScrollPropagation(div);
+          return div;
+        };
+        control.addTo(mapInstance);
+        mapLayers.routes.push(control);
+      }
+
+      if (displayRuns.length > 0 && bounds.isValid()) {
         mapInstance.fitBounds(bounds, { padding: [50, 50] });
       } else {
-        mapInstance.setView([37.5665, 126.9780], 13);
+        mapInstance.setView([37.5665, 126.9780], 11);
       }
+    }
+
+    // 시도 필터 클릭 핸들러
+    function filterByProvince(province) {
+      activeProvince = province;
+      renderMapContent();
     }
 
     function renderOverseasMode() {
@@ -1267,12 +1361,11 @@
       const countries = Object.keys(overseas);
 
       if (countries.length === 0) {
-        // 해외 기록 없음 안내
         const control = L.control({ position: 'topright' });
         control.onAdd = function() {
-          const div = L.DomUtil.create('div', 'overseas-panel');
+          const div = L.DomUtil.create('div', 'region-panel');
           div.innerHTML = `
-            <div class="overseas-header">🌍 해외 러닝 기록</div>
+            <div class="region-header">🌍 해외 러닝 기록</div>
             <div style="padding:16px;color:#94A3B8;text-align:center;">해외 러닝 기록이 없습니다</div>
           `;
           L.DomEvent.disableClickPropagation(div);
@@ -1284,34 +1377,9 @@
         return;
       }
 
-      const bounds = L.latLngBounds([]);
-
-      // 국가별로 경로 그리기
-      countries.forEach(country => {
-        const runs = overseas[country];
-        runs.forEach(entry => {
-          if (entry.points.length > 0) {
-            const polyline = L.polyline(entry.points, {
-              color: entry.color, weight: 3, opacity: 0.8,
-              lineCap: 'round', lineJoin: 'round'
-            }).addTo(mapInstance);
-            mapLayers.overseas.push(polyline);
-            entry.points.forEach(pt => bounds.extend(pt));
-          }
-          const [startLat, startLng] = entry.run.start_latlng;
-          if (startLat && startLng) {
-            const km = (entry.run.distance / 1000).toFixed(2);
-            const dateStr = entry.run.start_date_local ? entry.run.start_date_local.split('T')[0] : '';
-            const marker = L.circleMarker([startLat, startLng], {
-              radius: 6, fillColor: entry.color, color: '#fff',
-              weight: 2, opacity: 1, fillOpacity: 0.8
-            }).bindPopup(`<div style="font-size:12px"><strong>${entry.member.name}</strong><br><strong>${entry.run.name || '러닝'}</strong><br>${km}km · ${dateStr}<br>📍 ${country}</div>`
-            ).addTo(mapInstance);
-            mapLayers.overseas.push(marker);
-            bounds.extend([startLat, startLng]);
-          }
-        });
-      });
+      // 전체 해외 경로를 히트맵으로 그리기
+      const allOverseasRuns = Object.values(overseas).flat();
+      const bounds = drawHeatmapRoutes(allOverseasRuns, 'overseas');
 
       // 국가별 요약 패널
       const countryHtml = countries
@@ -1321,27 +1389,28 @@
           const totalKm = runs.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
           const memberSet = new Set(runs.map(e => e.member.name));
           return `
-            <div class="overseas-country" onclick="(function(){
+            <div class="region-item" onclick="(function(){
               const pts = [${runs.map(e => `[${e.run.start_latlng[0]},${e.run.start_latlng[1]}]`).join(',')}];
               if(pts.length && mapInstance) {
                 const b = L.latLngBounds(pts);
                 mapInstance.fitBounds(b, {padding:[50,50]});
               }
             })()">
-              <div class="overseas-country-name">${country}</div>
-              <div class="overseas-country-stats">${runs.length}회 · ${totalKm.toFixed(1)}km</div>
-              <div class="overseas-country-members">${Array.from(memberSet).join(', ')}</div>
+              <div class="region-name">${country}</div>
+              <div class="region-stats">${runs.length}회 · ${totalKm.toFixed(1)}km</div>
+              <div class="region-members">${Array.from(memberSet).join(', ')}</div>
             </div>`;
         }).join('');
 
       const control = L.control({ position: 'topright' });
       control.onAdd = function() {
-        const div = L.DomUtil.create('div', 'overseas-panel');
+        const div = L.DomUtil.create('div', 'region-panel');
         div.innerHTML = `
-          <div class="overseas-header">🌍 해외 러닝 기록</div>
-          <div class="overseas-list">${countryHtml}</div>
+          <div class="region-header">🌍 해외 러닝 기록</div>
+          <div class="region-list">${countryHtml}</div>
         `;
         L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
         return div;
       };
       control.addTo(mapInstance);

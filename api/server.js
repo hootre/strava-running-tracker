@@ -277,7 +277,7 @@ app.get('/auth/callback', async (req, res) => {
     }
     try {
       const settings = getSettings(db);
-      const after = Math.floor(Date.now() / 1000) - (90 * 24 * 60 * 60);
+      const after = Math.floor(new Date(new Date().getFullYear() - 1, 0, 1).getTime() / 1000);
       const allActivities = await getActivities(access_token, after);
       const runs = allActivities.filter(isRun);
       db.activities = db.activities.filter(a => a.strava_id !== athlete.id);
@@ -587,7 +587,7 @@ app.post('/api/admin/add-member', async (req, res) => {
       db.members.push(memberData);
     }
     try {
-      const after = Math.floor(Date.now() / 1000) - (90 * 24 * 60 * 60);
+      const after = Math.floor(new Date(new Date().getFullYear() - 1, 0, 1).getTime() / 1000);
       const allActivities = await getActivities(access_token, after);
       const runs = allActivities.filter(isRun);
       db.activities = db.activities.filter(a => a.strava_id !== athlete.id);
