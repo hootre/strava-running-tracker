@@ -1173,9 +1173,21 @@
       return { korea, overseas };
     }
 
-    // 좌표로 대략적 국가 판별
+    // 좌표로 대략적 국가/지역 판별
     function getCountryByCoords(lat, lng) {
-      if (lat >= 24 && lat <= 46 && lng >= 122 && lng <= 146) return '일본';
+      // 일본 지역 세분화 (좁은 범위 먼저)
+      if (lat >= 24 && lat <= 46 && lng >= 128 && lng <= 146) {
+        if (lat >= 35.55 && lat <= 35.85 && lng >= 139.55 && lng <= 139.95) return '일본 · 도쿄';
+        if (lat >= 34.55 && lat <= 34.80 && lng >= 135.35 && lng <= 135.60) return '일본 · 오사카';
+        if (lat >= 34.90 && lat <= 35.10 && lng >= 135.65 && lng <= 135.85) return '일본 · 교토';
+        if (lat >= 35.10 && lat <= 35.25 && lng >= 136.80 && lng <= 137.05) return '일본 · 나고야';
+        if (lat >= 33.50 && lat <= 33.70 && lng >= 130.25 && lng <= 130.55) return '일본 · 후쿠오카';
+        if (lat >= 43.00 && lat <= 43.20 && lng >= 141.25 && lng <= 141.45) return '일본 · 삿포로';
+        if (lat >= 35.40 && lat <= 35.55 && lng >= 139.55 && lng <= 139.75) return '일본 · 요코하마';
+        if (lat >= 34.35 && lat <= 34.50 && lng >= 132.40 && lng <= 132.55) return '일본 · 히로시마';
+        if (lat >= 26.20 && lat <= 26.45 && lng >= 127.60 && lng <= 127.85) return '일본 · 오키나와';
+        return '일본 · 기타';
+      }
       if (lat >= 18 && lat <= 54 && lng >= 73 && lng <= 135) return '중국';
       if (lat >= 5 && lat <= 21 && lng >= 97 && lng <= 110) return '태국/베트남';
       if (lat >= -11 && lat <= 6 && lng >= 95 && lng <= 141) return '인도네시아';
@@ -1305,11 +1317,17 @@
       const provinces = classifyKoreaByProvince(korea);
       const provinceNames = Object.keys(provinces).sort((a, b) => provinces[b].length - provinces[a].length);
 
-      // 선택된 시도의 데이터만 또는 전체
+      // 첫 진입 시 서울 기본 선택 (서울 데이터가 있으면)
+      if (!activeProvince && provinces['서울']) {
+        activeProvince = '서울';
+      } else if (!activeProvince && provinceNames.length > 0) {
+        activeProvince = provinceNames[0]; // 서울 없으면 가장 많은 지역
+      }
+
       const displayRuns = activeProvince ? (provinces[activeProvince] || []) : korea;
       const bounds = drawHeatmapRoutes(displayRuns, 'routes');
 
-      // 시도별 패널 (기록이 있는 시도만)
+      // 시도별 패널 (전체 없이 지역만)
       if (provinceNames.length > 0) {
         const provinceHtml = provinceNames.map(name => {
           const runs = provinces[name];
@@ -1324,22 +1342,12 @@
             </div>`;
         }).join('');
 
-        const allActive = !activeProvince;
-        const totalRuns = korea.length;
-        const totalKm = korea.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
-
         const control = L.control({ position: 'topright' });
         control.onAdd = function() {
           const div = L.DomUtil.create('div', 'region-panel');
           div.innerHTML = `
             <div class="region-header">🇰🇷 지역별 러닝</div>
-            <div class="region-list">
-              <div class="region-item ${allActive ? 'active' : ''}" onclick="filterByProvince(null)">
-                <div class="region-name">전체</div>
-                <div class="region-stats">${totalRuns}회 · ${totalKm.toFixed(1)}km</div>
-              </div>
-              ${provinceHtml}
-            </div>
+            <div class="region-list">${provinceHtml}</div>
           `;
           L.DomEvent.disableClickPropagation(div);
           L.DomEvent.disableScrollPropagation(div);
@@ -1352,7 +1360,7 @@
       if (displayRuns.length > 0 && bounds.isValid()) {
         mapInstance.fitBounds(bounds, { padding: [50, 50] });
       } else {
-        mapInstance.setView([37.5665, 126.9780], 11);
+        mapInstance.setView([37.5665, 126.9780], 13);
       }
     }
 
@@ -1444,10 +1452,16 @@
     function renderMapContent() {
       if (!mapInstance) return;
 
-      // Clear all layers except tiles
+      // Clear all layers and controls
       Object.values(mapLayers).forEach(layerArray => {
         layerArray.forEach(layer => {
-          if (layer.remove) mapInstance.removeLayer(layer);
+          try {
+            if (layer instanceof L.Control) {
+              mapInstance.removeControl(layer);
+            } else if (layer.remove) {
+              mapInstance.removeLayer(layer);
+            }
+          } catch(e) {}
         });
       });
       mapLayers = { routes: [], overseas: [] };
