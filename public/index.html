@@ -564,6 +564,64 @@
       color: var(--text-muted);
       line-height: 1.4;
     }
+
+    /* ─── Overseas Panel ─── */
+    .overseas-panel {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      width: 280px;
+      max-height: calc(100vh - 200px);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow-y: auto;
+      z-index: 50;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .overseas-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      position: sticky;
+      top: 0;
+      background: var(--bg-card);
+    }
+    .overseas-list {
+      padding: 8px;
+    }
+    .overseas-country {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--bg);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .overseas-country:hover {
+      background: var(--bg-hover);
+      border-color: var(--primary);
+    }
+    .overseas-country-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .overseas-country-stats {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+    .overseas-country-members {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -1128,9 +1186,63 @@
     let mapInstance = null;
     let mapMembers = {};
     let mapVisibleMembers = new Set();
-    let mapMode = 'routes'; // 'routes', 'territory', 'overlap', 'ranking'
-    let mapLayers = { routes: [], territory: [], overlap: [], ranking: [] }; // Layer management
+    let mapMode = 'routes';
+    let mapLayers = { routes: [], territory: [], overlap: [], ranking: [], overseas: [] };
     const memberColors = ['#FC4C02', '#3B82F6', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+
+    // 한국 영역 (lat 33~39, lng 124~132)
+    function isInKorea(lat, lng) {
+      return lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132;
+    }
+
+    // 비정상 경로 필터 (연속 포인트 간 10km 이상 점프 = 비정상)
+    function isValidRoute(points) {
+      if (!points || points.length < 2) return false;
+      for (let i = 1; i < points.length; i++) {
+        const dist = getDistance(points[i-1][0], points[i-1][1], points[i][0], points[i][1]);
+        if (dist > 10000) return false; // 10km 이상 점프
+      }
+      return true;
+    }
+
+    // 러닝 데이터를 한국/해외로 분류
+    function classifyRuns(members) {
+      const korea = [], overseas = {};
+      members.forEach((member, memberIdx) => {
+        if (!mapVisibleMembers.has(member.strava_id)) return;
+        const color = memberColors[memberIdx % memberColors.length];
+        const allRuns = member.allRuns || member.activities || [];
+        allRuns.forEach(run => {
+          if (!run.summary_polyline || !run.start_latlng) return;
+          const [lat, lng] = run.start_latlng;
+          if (!lat || !lng) return;
+          const points = decodePolyline(run.summary_polyline);
+          if (!isValidRoute(points)) return; // 비정상 경로 제외
+          const entry = { run, member, memberIdx, color, points };
+          if (isInKorea(lat, lng)) {
+            korea.push(entry);
+          } else {
+            const country = getCountryByCoords(lat, lng);
+            if (!overseas[country]) overseas[country] = [];
+            overseas[country].push(entry);
+          }
+        });
+      });
+      return { korea, overseas };
+    }
+
+    // 좌표로 대략적 국가 판별
+    function getCountryByCoords(lat, lng) {
+      if (lat >= 24 && lat <= 46 && lng >= 122 && lng <= 146) return '일본';
+      if (lat >= 18 && lat <= 54 && lng >= 73 && lng <= 135) return '중국';
+      if (lat >= 5 && lat <= 21 && lng >= 97 && lng <= 110) return '태국/베트남';
+      if (lat >= -11 && lat <= 6 && lng >= 95 && lng <= 141) return '인도네시아';
+      if (lat >= 1 && lat <= 8 && lng >= 103 && lng <= 105) return '싱가포르';
+      if (lat >= 25 && lat <= 50 && lng >= -125 && lng <= -66) return '미국';
+      if (lat >= 35 && lat <= 72 && lng >= -10 && lng <= 40) return '유럽';
+      if (lat >= -47 && lat <= -10 && lng >= 113 && lng <= 154) return '호주';
+      return `기타 (${lat.toFixed(1)}, ${lng.toFixed(1)})`;
+    }
 
     function setMapMode(mode) {
       mapMode = mode;
@@ -1190,28 +1302,18 @@
       return R * c;
     }
 
-    // Find overlapping route segments
+    // Find overlapping route segments (한국 내 경로만)
     function findOverlapSegments(threshold = 200) {
       const overlaps = [];
       const { members } = dashboardData;
-      const visibleRuns = [];
-
-      // Collect all visible runs
-      members.forEach((member, memberIdx) => {
-        if (!mapVisibleMembers.has(member.strava_id)) return;
-        const allRuns = member.allRuns || member.activities || [];
-        allRuns.forEach(run => {
-          if (run.summary_polyline && run.start_latlng) {
-            visibleRuns.push({
-              points: decodePolyline(run.summary_polyline),
-              memberIdx,
-              memberName: member.name,
-              color: memberColors[memberIdx % memberColors.length],
-              runName: run.name
-            });
-          }
-        });
-      });
+      const { korea } = classifyRuns(members);
+      const visibleRuns = korea.map(e => ({
+        points: e.points,
+        memberIdx: e.memberIdx,
+        memberName: e.member.name,
+        color: e.color,
+        runName: e.run.name
+      }));
 
       // Find overlapping segments
       for (let i = 0; i < visibleRuns.length; i++) {
@@ -1242,46 +1344,40 @@
       return overlaps;
     }
 
-    // Get course rankings
+    // Get course rankings (한국 내 경로만)
     function getCourseRankings(threshold = 500) {
       const { members } = dashboardData;
-      const courses = {}; // { courseKey: { name, runs: [], members: Set } }
+      const { korea } = classifyRuns(members);
+      const courses = {};
 
-      members.forEach((member, memberIdx) => {
-        if (!mapVisibleMembers.has(member.strava_id)) return;
-        const allRuns = member.allRuns || member.activities || [];
-        allRuns.forEach(run => {
-          if (run.start_latlng) {
-            const [startLat, startLng] = run.start_latlng;
-            // Find if this start location matches existing course
-            let courseKey = null;
-            for (const key in courses) {
-              const course = courses[key];
-              const [courseLat, courseLng] = course.center;
-              const dist = getDistance(startLat, startLng, courseLat, courseLng);
-              if (dist < threshold) {
-                courseKey = key;
-                break;
-              }
-            }
+      korea.forEach(entry => {
+        const [startLat, startLng] = entry.run.start_latlng;
+        if (!startLat || !startLng) return;
 
-            if (!courseKey) {
-              courseKey = `${startLat.toFixed(4)},${startLng.toFixed(4)}`;
-              courses[courseKey] = {
-                center: [startLat, startLng],
-                runs: [],
-                members: new Set(),
-                name: '' // Will compute later based on coordinates
-              };
-            }
-
-            courses[courseKey].runs.push(run);
-            courses[courseKey].members.add(member.name);
+        let courseKey = null;
+        for (const key in courses) {
+          const course = courses[key];
+          const [courseLat, courseLng] = course.center;
+          const dist = getDistance(startLat, startLng, courseLat, courseLng);
+          if (dist < threshold) {
+            courseKey = key;
+            break;
           }
-        });
+        }
+
+        if (!courseKey) {
+          courseKey = `${startLat.toFixed(4)},${startLng.toFixed(4)}`;
+          courses[courseKey] = {
+            center: [startLat, startLng],
+            runs: [],
+            members: new Set()
+          };
+        }
+
+        courses[courseKey].runs.push(entry.run);
+        courses[courseKey].members.add(entry.member.name);
       });
 
-      // Sort by run count
       const sorted = Object.entries(courses)
         .map(([key, course]) => ({
           key,
@@ -1302,67 +1398,34 @@
       return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
     }
 
-    function renderRoutesMode() {
-      // Default route visualization
-      if (mapLayers.routes.length > 0) {
-        mapLayers.routes.forEach(layer => mapInstance.removeLayer(layer));
-        mapLayers.routes = [];
+    function drawRunOnMap(entry, bounds, layerKey) {
+      const { run, member, color, points } = entry;
+      if (points.length > 0) {
+        const polyline = L.polyline(points, {
+          color, weight: 3, opacity: 0.8, lineCap: 'round', lineJoin: 'round'
+        }).addTo(mapInstance);
+        mapLayers[layerKey].push(polyline);
+        points.forEach(pt => bounds.extend(pt));
       }
+      const [startLat, startLng] = run.start_latlng;
+      if (startLat && startLng) {
+        const km = (run.distance / 1000).toFixed(2);
+        const dateStr = run.start_date_local.split('T')[0];
+        const marker = L.circleMarker([startLat, startLng], {
+          radius: 6, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8
+        }).bindPopup(`<div style="font-size:12px"><strong>${member.name}</strong><br><strong>${run.name || '러닝'}</strong><br>${km}km · ${dateStr}</div>`
+        ).addTo(mapInstance);
+        mapLayers[layerKey].push(marker);
+        bounds.extend([startLat, startLng]);
+      }
+    }
 
+    function renderRoutesMode() {
       const { members } = dashboardData;
+      const { korea } = classifyRuns(members);
       const bounds = L.latLngBounds([]);
-      let hasRoutes = false;
-
-      members.forEach((member, memberIdx) => {
-        if (!mapVisibleMembers.has(member.strava_id)) return;
-        const color = memberColors[memberIdx % memberColors.length];
-        const allRuns = member.allRuns || member.activities || [];
-
-        allRuns.forEach(run => {
-          if (!run.summary_polyline || !run.start_latlng) return;
-          hasRoutes = true;
-
-          // Draw polyline
-          const points = decodePolyline(run.summary_polyline);
-          if (points.length > 0) {
-            const polyline = L.polyline(points, {
-              color: color,
-              weight: 3,
-              opacity: 0.8,
-              lineCap: 'round',
-              lineJoin: 'round'
-            }).addTo(mapInstance);
-            mapLayers.routes.push(polyline);
-            points.forEach(pt => bounds.extend(pt));
-          }
-
-          // Add start marker
-          const [startLat, startLng] = run.start_latlng;
-          if (startLat && startLng) {
-            const km = (run.distance / 1000).toFixed(2);
-            const dateStr = run.start_date_local.split('T')[0];
-            const marker = L.circleMarker([startLat, startLng], {
-              radius: 6,
-              fillColor: color,
-              color: '#ffffff',
-              weight: 2,
-              opacity: 1,
-              fillOpacity: 0.8
-            }).bindPopup(`
-              <div style="font-size:12px">
-                <strong>${member.name}</strong><br>
-                <strong>${run.name || '러닝'}</strong><br>
-                ${km}km<br>
-                ${dateStr}
-              </div>
-            `).addTo(mapInstance);
-            mapLayers.routes.push(marker);
-            bounds.extend([startLat, startLng]);
-          }
-        });
-      });
-
-      if (hasRoutes && bounds.isValid()) {
+      korea.forEach(entry => drawRunOnMap(entry, bounds, 'routes'));
+      if (korea.length > 0 && bounds.isValid()) {
         mapInstance.fitBounds(bounds, { padding: [50, 50] });
       } else {
         mapInstance.setView([37.5665, 126.9780], 13);
@@ -1370,31 +1433,16 @@
     }
 
     function renderTerritoryMode() {
-      if (mapLayers.territory.length > 0) {
-        mapLayers.territory.forEach(layer => mapInstance.removeLayer(layer));
-        mapLayers.territory = [];
-      }
-
       const { members } = dashboardData;
-      const gridCells = {}; // { key: { count, coverage } }
-      const cellSize = 500; // 500 meters
+      const { korea } = classifyRuns(members);
+      const gridCells = {};
+      const cellSize = 500;
 
-      // Collect all decoded points and build grid
-      members.forEach(member => {
-        if (!mapVisibleMembers.has(member.strava_id)) return;
-        const allRuns = member.allRuns || member.activities || [];
-
-        allRuns.forEach(run => {
-          if (!run.summary_polyline) return;
-          const points = decodePolyline(run.summary_polyline);
-
-          points.forEach(([lat, lng]) => {
-            const key = latlngToGridKey(lat, lng, cellSize);
-            if (!gridCells[key]) {
-              gridCells[key] = { count: 0, coverage: 0 };
-            }
-            gridCells[key].count += 1;
-          });
+      korea.forEach(entry => {
+        entry.points.forEach(([lat, lng]) => {
+          const key = latlngToGridKey(lat, lng, cellSize);
+          if (!gridCells[key]) gridCells[key] = { count: 0 };
+          gridCells[key].count += 1;
         });
       });
 
@@ -1437,38 +1485,19 @@
     }
 
     function renderOverlapMode() {
-      if (mapLayers.overlap.length > 0) {
-        mapLayers.overlap.forEach(layer => {
-          if (layer.remove) mapInstance.removeLayer(layer);
-        });
-        mapLayers.overlap = [];
-      }
-
-      // First render all routes in a muted color
       const { members } = dashboardData;
+      const { korea } = classifyRuns(members);
       const bounds = L.latLngBounds([]);
-      let hasRoutes = false;
 
-      members.forEach((member, memberIdx) => {
-        if (!mapVisibleMembers.has(member.strava_id)) return;
-        const allRuns = member.allRuns || member.activities || [];
-
-        allRuns.forEach(run => {
-          if (!run.summary_polyline) return;
-          hasRoutes = true;
-          const points = decodePolyline(run.summary_polyline);
-          if (points.length > 0) {
-            const polyline = L.polyline(points, {
-              color: '#555555',
-              weight: 2,
-              opacity: 0.3,
-              lineCap: 'round',
-              lineJoin: 'round'
-            }).addTo(mapInstance);
-            mapLayers.overlap.push(polyline);
-            points.forEach(pt => bounds.extend(pt));
-          }
-        });
+      // 배경 경로 (회색)
+      korea.forEach(entry => {
+        if (entry.points.length > 0) {
+          const polyline = L.polyline(entry.points, {
+            color: '#555555', weight: 2, opacity: 0.3
+          }).addTo(mapInstance);
+          mapLayers.overlap.push(polyline);
+          entry.points.forEach(pt => bounds.extend(pt));
+        }
       });
 
       // Find and highlight overlaps
@@ -1519,31 +1548,20 @@
         mapLayers.ranking = [];
       }
 
-      // Render all routes in background
+      // 한국 내 경로만 표시
       const { members } = dashboardData;
+      const { korea } = classifyRuns(members);
       const bounds = L.latLngBounds([]);
-      let hasRoutes = false;
 
-      members.forEach((member, memberIdx) => {
-        if (!mapVisibleMembers.has(member.strava_id)) return;
-        const allRuns = member.allRuns || member.activities || [];
-
-        allRuns.forEach(run => {
-          if (!run.summary_polyline) return;
-          hasRoutes = true;
-          const points = decodePolyline(run.summary_polyline);
-          if (points.length > 0) {
-            const polyline = L.polyline(points, {
-              color: memberColors[memberIdx % memberColors.length],
-              weight: 2,
-              opacity: 0.3,
-              lineCap: 'round',
-              lineJoin: 'round'
-            }).addTo(mapInstance);
-            mapLayers.ranking.push(polyline);
-            points.forEach(pt => bounds.extend(pt));
-          }
-        });
+      korea.forEach(entry => {
+        if (entry.points.length > 0) {
+          const polyline = L.polyline(entry.points, {
+            color: entry.color, weight: 2, opacity: 0.3,
+            lineCap: 'round', lineJoin: 'round'
+          }).addTo(mapInstance);
+          mapLayers.ranking.push(polyline);
+          entry.points.forEach(pt => bounds.extend(pt));
+        }
       });
 
       // Get course rankings
@@ -1559,7 +1577,6 @@
         </div>
       `).join('');
 
-      // Create control
       const control = L.control({ position: 'topright' });
       control.onAdd = function(map) {
         const div = L.DomUtil.create('div', 'ranking-panel');
@@ -1573,10 +1590,103 @@
       control.addTo(mapInstance);
       mapLayers.ranking.push(control);
 
-      if (hasRoutes && bounds.isValid()) {
+      if (korea.length > 0 && bounds.isValid()) {
         mapInstance.fitBounds(bounds, { padding: [50, 50] });
       } else {
         mapInstance.setView([37.5665, 126.9780], 13);
+      }
+    }
+
+    function renderOverseasMode() {
+      const { members } = dashboardData;
+      const { overseas } = classifyRuns(members);
+      const countries = Object.keys(overseas);
+
+      if (countries.length === 0) {
+        // 해외 기록 없음 안내
+        const control = L.control({ position: 'topright' });
+        control.onAdd = function() {
+          const div = L.DomUtil.create('div', 'overseas-panel');
+          div.innerHTML = `
+            <div class="overseas-header">🌍 해외 러닝 기록</div>
+            <div style="padding:16px;color:#94A3B8;text-align:center;">해외 러닝 기록이 없습니다</div>
+          `;
+          L.DomEvent.disableClickPropagation(div);
+          return div;
+        };
+        control.addTo(mapInstance);
+        mapLayers.overseas.push(control);
+        mapInstance.setView([37.5665, 126.9780], 3);
+        return;
+      }
+
+      const bounds = L.latLngBounds([]);
+
+      // 국가별로 경로 그리기
+      countries.forEach(country => {
+        const runs = overseas[country];
+        runs.forEach(entry => {
+          if (entry.points.length > 0) {
+            const polyline = L.polyline(entry.points, {
+              color: entry.color, weight: 3, opacity: 0.8,
+              lineCap: 'round', lineJoin: 'round'
+            }).addTo(mapInstance);
+            mapLayers.overseas.push(polyline);
+            entry.points.forEach(pt => bounds.extend(pt));
+          }
+          const [startLat, startLng] = entry.run.start_latlng;
+          if (startLat && startLng) {
+            const km = (entry.run.distance / 1000).toFixed(2);
+            const dateStr = entry.run.start_date_local ? entry.run.start_date_local.split('T')[0] : '';
+            const marker = L.circleMarker([startLat, startLng], {
+              radius: 6, fillColor: entry.color, color: '#fff',
+              weight: 2, opacity: 1, fillOpacity: 0.8
+            }).bindPopup(`<div style="font-size:12px"><strong>${entry.member.name}</strong><br><strong>${entry.run.name || '러닝'}</strong><br>${km}km · ${dateStr}<br>📍 ${country}</div>`
+            ).addTo(mapInstance);
+            mapLayers.overseas.push(marker);
+            bounds.extend([startLat, startLng]);
+          }
+        });
+      });
+
+      // 국가별 요약 패널
+      const countryHtml = countries
+        .sort((a, b) => overseas[b].length - overseas[a].length)
+        .map(country => {
+          const runs = overseas[country];
+          const totalKm = runs.reduce((sum, e) => sum + (e.run.distance || 0), 0) / 1000;
+          const memberSet = new Set(runs.map(e => e.member.name));
+          return `
+            <div class="overseas-country" onclick="(function(){
+              const pts = [${runs.map(e => `[${e.run.start_latlng[0]},${e.run.start_latlng[1]}]`).join(',')}];
+              if(pts.length && mapInstance) {
+                const b = L.latLngBounds(pts);
+                mapInstance.fitBounds(b, {padding:[50,50]});
+              }
+            })()">
+              <div class="overseas-country-name">${country}</div>
+              <div class="overseas-country-stats">${runs.length}회 · ${totalKm.toFixed(1)}km</div>
+              <div class="overseas-country-members">${Array.from(memberSet).join(', ')}</div>
+            </div>`;
+        }).join('');
+
+      const control = L.control({ position: 'topright' });
+      control.onAdd = function() {
+        const div = L.DomUtil.create('div', 'overseas-panel');
+        div.innerHTML = `
+          <div class="overseas-header">🌍 해외 러닝 기록</div>
+          <div class="overseas-list">${countryHtml}</div>
+        `;
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+      control.addTo(mapInstance);
+      mapLayers.overseas.push(control);
+
+      if (bounds.isValid()) {
+        mapInstance.fitBounds(bounds, { padding: [50, 50] });
+      } else {
+        mapInstance.setView([37.5665, 126.9780], 3);
       }
     }
 
@@ -1589,7 +1699,7 @@
           if (layer.remove) mapInstance.removeLayer(layer);
         });
       });
-      mapLayers = { routes: [], territory: [], overlap: [], ranking: [] };
+      mapLayers = { routes: [], territory: [], overlap: [], ranking: [], overseas: [] };
 
       switch (mapMode) {
         case 'territory':
@@ -1600,6 +1710,9 @@
           break;
         case 'ranking':
           renderRankingMode();
+          break;
+        case 'overseas':
+          renderOverseasMode();
           break;
         default:
           renderRoutesMode();
@@ -1635,6 +1748,7 @@
           <button class="mode-btn" data-mode="territory" onclick="setMapMode('territory')">영역 정복</button>
           <button class="mode-btn" data-mode="overlap" onclick="setMapMode('overlap')">겹치는 코스</button>
           <button class="mode-btn" data-mode="ranking" onclick="setMapMode('ranking')">코스 랭킹</button>
+          <button class="mode-btn" data-mode="overseas" onclick="setMapMode('overseas')">🌍 해외</button>
         </div>
       `;
 
