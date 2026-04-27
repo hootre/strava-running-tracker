@@ -10,10 +10,9 @@
   <link rel="apple-touch-icon" href="/icon-192.png">
   <meta name="apple-mobile-web-app-title" content="SM러닝크루">
   <title>SM러닝크루</title>
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR97aA=" crossorigin=""/>
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-WBkoXQa7zzL+UwxaTKZNSYu1OMkXP7b6qQlMHUdPQA=" crossorigin=""></script>
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     (function() {
       var ua = navigator.userAgent || '';
@@ -318,7 +317,7 @@
       .penalty-section { margin: 0 0 20px; border-radius: 16px; }
       .penalty-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
       table { min-width: auto; }
-      #mapContainer { height: calc(100dvh - 56px - 50px - 50px - 48px); }
+      #mapContainer { height: 600px; }
       .modal-overlay { align-items: center; }
       .modal-sheet { border-radius: 20px; max-width: 520px; max-height: 80vh; margin: 0 20px; }
     }
@@ -409,11 +408,7 @@
     /* ─── Map Tab ─── */
     #mapContainer {
       width: 100%;
-      min-height: 400px;
-      height: calc(100dvh - 56px - 64px - 50px - 48px);
-      border-radius: 0;
-      position: relative;
-      z-index: 1;
+      height: 500px;
     }
     .leaflet-container { background: var(--bg) !important; }
     .map-filter {
@@ -1646,38 +1641,45 @@
       const contentDiv = document.getElementById('content');
       contentDiv.innerHTML = filterHtml + modeHtml + '<div id="mapContainer"></div>';
 
+      // Initialize visible members set
+      if (mapVisibleMembers.size === 0) {
+        members.forEach(m => mapVisibleMembers.add(m.strava_id));
+      }
+
       // Initialize map after DOM is rendered
       setTimeout(() => {
         if (mapInstance) {
-          mapInstance.remove();
+          try { mapInstance.remove(); } catch(e) {}
           mapInstance = null;
         }
 
         const container = document.getElementById('mapContainer');
         if (!container) return;
 
-        // Ensure container has dimensions
-        if (container.offsetHeight < 10) {
-          container.style.height = (window.innerHeight - 220) + 'px';
+        // 동적 높이 계산: 화면 높이 - 위에 있는 요소들
+        const rect = container.getBoundingClientRect();
+        const tabBarH = window.innerWidth < 768 ? 64 : 0;
+        const availH = window.innerHeight - rect.top - tabBarH - 10;
+        container.style.height = Math.max(350, availH) + 'px';
+
+        try {
+          mapInstance = L.map('mapContainer').setView([37.5665, 126.9780], 13);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 19
+          }).addTo(mapInstance);
+
+          setTimeout(() => {
+            if (mapInstance) {
+              mapInstance.invalidateSize();
+              renderMapContent();
+            }
+          }, 200);
+        } catch(e) {
+          console.error('Map init error:', e);
+          container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">지도를 불러올 수 없습니다. 새로고침 해주세요.</div>';
         }
-
-        mapInstance = L.map('mapContainer', { zoomControl: true }).setView([37.5665, 126.9780], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap',
-          maxZoom: 19
-        }).addTo(mapInstance);
-
-        // Initialize visible members set
-        if (mapVisibleMembers.size === 0) {
-          members.forEach(m => mapVisibleMembers.add(m.strava_id));
-        }
-
-        // Force Leaflet to recalculate size
-        setTimeout(() => {
-          mapInstance.invalidateSize();
-          renderMapContent();
-        }, 100);
-      }, 50);
+      }, 100);
     }
 
     function toggleMapMember(stravaId, chipEl) {
