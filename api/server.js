@@ -469,7 +469,7 @@ app.post('/api/sync', async (req, res) => {
 
   const settings = getSettings(db);
   const results = [];
-  const after = Math.floor(Date.now() / 1000) - (90 * 24 * 60 * 60);
+  const after = Math.floor(new Date(new Date().getFullYear() - 1, 0, 1).getTime() / 1000);
   let changed = false;
 
   for (const member of db.members) {

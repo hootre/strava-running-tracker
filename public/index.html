@@ -803,12 +803,11 @@
       const totalMonthlyKm = members.reduce((s, m) => s + (m.monthlyKm || 0), 0);
 
       const currentWeekNum = getWeekNumber(ws);
-      const weekLabel = currentWeekNum ? `${currentWeekNum}주차` : '-';
 
       document.getElementById('statsBar').innerHTML = `
         <div class="stat-card">
-          <div class="stat-label">현재</div>
-          <div class="stat-value primary">${weekLabel}</div>
+          <div class="stat-label">회차</div>
+          <div class="stat-value primary">${currentWeekNum ? currentWeekNum + '주차' : '-'}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">참가자</div>
@@ -1582,7 +1581,7 @@
       cur.setDate(cur.getDate() + 1);
       while (cur.getDay() !== 1) cur.setDate(cur.getDate() + 1);
       for (let i = 0; i < 104; i++) {
-        allWeekStarts.push(cur.toISOString().split('T')[0]);
+        allWeekStarts.push(toLocalDateStr(cur));
         cur.setDate(cur.getDate() + 7);
       }
       const idx = allWeekStarts.indexOf(weekStart);
@@ -1628,8 +1627,9 @@
       }
       html += '</div></div>';
 
-      // 주간 상세 (주차별 섹션)
-      for (const w of sortedWeeks) {
+      // 주간 상세 (주차별 아코디언)
+      for (let wi = 0; wi < sortedWeeks.length; wi++) {
+        const w = sortedWeeks[wi];
         const weekNum = getWeekNumber(w);
         const weekLabel = weekNum ? `${weekNum}주차` : w.slice(5);
         const weekPenalty = sorted[0]?.penalties.find(p => p.week_start === w);
@@ -1637,34 +1637,34 @@
         const dateRange = `${w.slice(5).replace('-','/')} ~ ${weStr.slice(5).replace('-','/')}`;
         const isCurrent = w === currentWeekStart;
 
-        // 이번 주 전체 통과/미달 요약
         const passCount = sorted.filter(m => m.penalties.find(p => p.week_start === w)?.passed).length;
         const failCount = sorted.length - passCount;
 
+        // 현재 진행중인 주차만 기본 펼침
+        const isOpen = isCurrent;
+
         html += `
           <div class="penalty-section">
-            <div class="penalty-header" style="display:flex;justify-content:space-between;align-items:center">
+            <div class="penalty-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none" onclick="toggleWeekDetail('week-detail-${wi}', this)">
               <div>
                 <h2 style="display:flex;align-items:center;gap:8px">
-                  &#x1F4CB; ${weekLabel}
+                  <span class="week-chevron" style="font-size:11px;transition:transform 0.2s;display:inline-block;${isOpen ? 'transform:rotate(90deg)' : ''}"">▶</span>
+                  ${weekLabel}
                   ${isCurrent ? '<span style="font-size:11px;background:rgba(252,76,2,0.2);color:var(--primary);padding:2px 8px;border-radius:10px;font-weight:700">진행중</span>' : ''}
                 </h2>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${dateRange}</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:3px;margin-left:20px">${dateRange}</div>
               </div>
               <div style="text-align:right;font-size:12px">
-                <span style="color:var(--success);font-weight:700">✅ ${passCount}명</span>
-                ${failCount > 0 ? `<span style="color:var(--danger);font-weight:700;margin-left:8px">❌ ${failCount}명</span>` : ''}
+                <span style="color:var(--success);font-weight:700">✅ ${passCount}</span>
+                ${failCount > 0 ? `<span style="color:var(--danger);font-weight:700;margin-left:8px">❌ ${failCount}</span>` : ''}
               </div>
             </div>
-            <div style="padding:8px 16px 14px;display:flex;flex-direction:column;gap:8px">`;
+            <div id="week-detail-${wi}" style="padding:8px 16px 14px;display:${isOpen ? 'flex' : 'none'};flex-direction:column;gap:8px">`;
 
-        // 멤버별 결과를 통과/미달 순으로
         const weekMembers = [...sorted].sort((a, b) => {
           const pa = a.penalties.find(p => p.week_start === w);
           const pb = b.penalties.find(p => p.week_start === w);
-          const kmA = pa?.total_km || 0;
-          const kmB = pb?.total_km || 0;
-          return kmB - kmA;
+          return (pb?.total_km || 0) - (pa?.total_km || 0);
         });
 
         for (const m of weekMembers) {
@@ -1698,6 +1698,15 @@
       }
 
       document.getElementById('content').innerHTML = html;
+    }
+
+    function toggleWeekDetail(id, headerEl) {
+      const detail = document.getElementById(id);
+      if (!detail) return;
+      const isHidden = detail.style.display === 'none';
+      detail.style.display = isHidden ? 'flex' : 'none';
+      const chevron = headerEl.querySelector('.week-chevron');
+      if (chevron) chevron.style.transform = isHidden ? 'rotate(90deg)' : '';
     }
 
     // ── 챌린지 정보 바 렌더링 ──
