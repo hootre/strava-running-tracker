@@ -487,84 +487,6 @@
       transform: scale(0.96);
     }
 
-    /* ─── Territory Stat ─── */
-    .territory-stat {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-size: 14px;
-      font-weight: 600;
-      z-index: 50;
-      color: var(--text);
-    }
-
-    /* ─── Ranking Panel ─── */
-    .ranking-panel {
-      position: absolute;
-      right: 20px;
-      top: 20px;
-      width: 280px;
-      max-height: calc(100vh - 200px);
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow-y: auto;
-      z-index: 50;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    }
-    .ranking-header {
-      padding: 16px;
-      border-bottom: 1px solid var(--border);
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text);
-      position: sticky;
-      top: 0;
-      background: var(--bg-card);
-    }
-    .ranking-list {
-      padding: 8px;
-    }
-    .ranking-item {
-      padding: 12px;
-      margin-bottom: 8px;
-      background: var(--bg);
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .ranking-item:hover {
-      background: var(--bg-hover);
-      border-color: var(--primary);
-    }
-    .ranking-item-rank {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-    .ranking-item-name {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 4px;
-    }
-    .ranking-item-count {
-      font-size: 14px;
-      font-weight: 800;
-      color: var(--primary);
-      margin-bottom: 6px;
-    }
-    .ranking-item-members {
-      font-size: 11px;
-      color: var(--text-muted);
-      line-height: 1.4;
-    }
-
     /* ─── Overseas Panel ─── */
     .overseas-panel {
       position: absolute;
@@ -1187,7 +1109,7 @@
     let mapMembers = {};
     let mapVisibleMembers = new Set();
     let mapMode = 'routes';
-    let mapLayers = { routes: [], territory: [], overlap: [], ranking: [], overseas: [] };
+    let mapLayers = { routes: [], overseas: [] };
     const memberColors = ['#FC4C02', '#3B82F6', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
     // 한국 영역 (lat 33~39, lng 124~132)
@@ -1252,45 +1174,9 @@
       renderMapContent();
     }
 
-    // Grid utility for territory mode
-    function latlngToGridKey(lat, lng, cellSize = 500) {
-      // cellSize in meters; convert to approximate lat/lng
-      const metersPerDegLat = 111000;
-      const metersPerDegLng = Math.cos(lat * Math.PI / 180) * 111000;
-      const cellLat = cellSize / metersPerDegLat;
-      const cellLng = cellSize / metersPerDegLng;
-      const gridLat = Math.floor(lat / cellLat);
-      const gridLng = Math.floor(lng / cellLng);
-      return `${gridLat},${gridLng}`;
-    }
-
-    // Reverse grid key to lat/lng
-    function gridKeyToLatlng(key, cellSize = 500) {
-      const [gridLat, gridLng] = key.split(',').map(Number);
-      const metersPerDegLat = 111000;
-      const metersPerDegLng = 111000; // approximate
-      const cellLat = cellSize / metersPerDegLat;
-      const cellLng = cellSize / metersPerDegLng;
-      return [gridLat * cellLat, gridLng * cellLng];
-    }
-
-    // Get coordinates of grid cell bounds
-    function getGridCellBounds(key, cellSize = 500) {
-      const metersPerDegLat = 111000;
-      const metersPerDegLng = 111000;
-      const cellLat = cellSize / metersPerDegLat;
-      const cellLng = cellSize / metersPerDegLng;
-      const [gridLat, gridLng] = key.split(',').map(Number);
-      const north = (gridLat + 1) * cellLat;
-      const south = gridLat * cellLat;
-      const east = (gridLng + 1) * cellLng;
-      const west = gridLng * cellLng;
-      return [[south, west], [north, east]];
-    }
-
-    // Distance between two points (simplified)
+    // Distance between two points (Haversine)
     function getDistance(lat1, lng1, lat2, lng2) {
-      const R = 6371000; // Earth radius in meters
+      const R = 6371000;
       const φ1 = lat1 * Math.PI / 180;
       const φ2 = lat2 * Math.PI / 180;
       const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -1302,293 +1188,71 @@
       return R * c;
     }
 
-    // Find overlapping route segments (한국 내 경로만)
-    function findOverlapSegments(threshold = 200) {
-      const overlaps = [];
-      const { members } = dashboardData;
-      const { korea } = classifyRuns(members);
-      const visibleRuns = korea.map(e => ({
-        points: e.points,
-        memberIdx: e.memberIdx,
-        memberName: e.member.name,
-        color: e.color,
-        runName: e.run.name
-      }));
-
-      // Find overlapping segments
-      for (let i = 0; i < visibleRuns.length; i++) {
-        for (let j = i + 1; j < visibleRuns.length; j++) {
-          const run1 = visibleRuns[i];
-          const run2 = visibleRuns[j];
-
-          for (let p1 = 0; p1 < run1.points.length - 1; p1++) {
-            for (let p2 = 0; p2 < run2.points.length - 1; p2++) {
-              const [lat1, lng1] = run1.points[p1];
-              const [lat2, lng2] = run2.points[p2];
-              const dist = getDistance(lat1, lng1, lat2, lng2);
-
-              if (dist < threshold) {
-                // Found overlap, store segment
-                overlaps.push({
-                  point: [lat1, lng1],
-                  segment1: { start: run1.points[p1], end: run1.points[p1 + 1], ...run1 },
-                  segment2: { start: run2.points[p2], end: run2.points[p2 + 1], ...run2 },
-                  distance: dist
-                });
-              }
-            }
-          }
-        }
-      }
-
-      return overlaps;
-    }
-
-    // Get course rankings (한국 내 경로만)
-    function getCourseRankings(threshold = 500) {
-      const { members } = dashboardData;
-      const { korea } = classifyRuns(members);
-      const courses = {};
-
-      korea.forEach(entry => {
-        const [startLat, startLng] = entry.run.start_latlng;
-        if (!startLat || !startLng) return;
-
-        let courseKey = null;
-        for (const key in courses) {
-          const course = courses[key];
-          const [courseLat, courseLng] = course.center;
-          const dist = getDistance(startLat, startLng, courseLat, courseLng);
-          if (dist < threshold) {
-            courseKey = key;
-            break;
-          }
-        }
-
-        if (!courseKey) {
-          courseKey = `${startLat.toFixed(4)},${startLng.toFixed(4)}`;
-          courses[courseKey] = {
-            center: [startLat, startLng],
-            runs: [],
-            members: new Set()
-          };
-        }
-
-        courses[courseKey].runs.push(entry.run);
-        courses[courseKey].members.add(entry.member.name);
-      });
-
-      const sorted = Object.entries(courses)
-        .map(([key, course]) => ({
-          key,
-          ...course,
-          count: course.runs.length,
-          membersList: Array.from(course.members).join(', ')
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-
-      return sorted;
-    }
-
-    // Get location name from coordinates (simple approach)
-    function getLocationName(lat, lng) {
-      // Simple clustering - could use a reverse geocoding API
-      // For now, return grid-based name
-      return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
-    }
-
-    function drawRunOnMap(entry, bounds, layerKey) {
-      const { run, member, color, points } = entry;
-      if (points.length > 0) {
-        const polyline = L.polyline(points, {
-          color, weight: 3, opacity: 0.8, lineCap: 'round', lineJoin: 'round'
-        }).addTo(mapInstance);
-        mapLayers[layerKey].push(polyline);
-        points.forEach(pt => bounds.extend(pt));
-      }
-      const [startLat, startLng] = run.start_latlng;
-      if (startLat && startLng) {
-        const km = (run.distance / 1000).toFixed(2);
-        const dateStr = run.start_date_local.split('T')[0];
-        const marker = L.circleMarker([startLat, startLng], {
-          radius: 6, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8
-        }).bindPopup(`<div style="font-size:12px"><strong>${member.name}</strong><br><strong>${run.name || '러닝'}</strong><br>${km}km · ${dateStr}</div>`
-        ).addTo(mapInstance);
-        mapLayers[layerKey].push(marker);
-        bounds.extend([startLat, startLng]);
-      }
-    }
-
     function renderRoutesMode() {
       const { members } = dashboardData;
       const { korea } = classifyRuns(members);
       const bounds = L.latLngBounds([]);
-      korea.forEach(entry => drawRunOnMap(entry, bounds, 'routes'));
-      if (korea.length > 0 && bounds.isValid()) {
-        mapInstance.fitBounds(bounds, { padding: [50, 50] });
-      } else {
-        mapInstance.setView([37.5665, 126.9780], 13);
-      }
-    }
 
-    function renderTerritoryMode() {
-      const { members } = dashboardData;
-      const { korea } = classifyRuns(members);
-      const gridCells = {};
-      const cellSize = 500;
-
+      // 히트맵 스타일: 넓은 글로우 → 중간 → 얇은 코어 3겹으로 겹칠수록 밝아지는 효과
       korea.forEach(entry => {
-        entry.points.forEach(([lat, lng]) => {
-          const key = latlngToGridKey(lat, lng, cellSize);
-          if (!gridCells[key]) gridCells[key] = { count: 0 };
-          gridCells[key].count += 1;
-        });
-      });
+        if (entry.points.length === 0) return;
+        entry.points.forEach(pt => bounds.extend(pt));
 
-      // Calculate coverage area
-      let totalCoveredCells = Object.keys(gridCells).length;
-      let totalArea = (totalCoveredCells * cellSize * cellSize) / 1000000; // km²
-
-      // Draw grid cells
-      const maxCount = Math.max(...Object.values(gridCells).map(c => c.count), 1);
-
-      Object.entries(gridCells).forEach(([key, cell]) => {
-        const bounds = getGridCellBounds(key, cellSize);
-        const opacity = 0.3 + (cell.count / maxCount) * 0.5; // 0.3 to 0.8
-        const hue = 15; // Orange
-        const saturation = Math.min(50 + (cell.count / maxCount) * 50, 100);
-        const lightness = Math.max(50 - (cell.count / maxCount) * 25, 25);
-        const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-
-        const rectangle = L.rectangle(bounds, {
-          color: color,
-          weight: 1,
-          opacity: 0.6,
-          fillColor: color,
-          fillOpacity: opacity
+        // Layer 1: Wide glow (넓은 배경광)
+        const glow = L.polyline(entry.points, {
+          color: entry.color, weight: 10, opacity: 0.08,
+          lineCap: 'round', lineJoin: 'round'
         }).addTo(mapInstance);
-        mapLayers.territory.push(rectangle);
+        mapLayers.routes.push(glow);
+
+        // Layer 2: Mid glow (중간 광택)
+        const mid = L.polyline(entry.points, {
+          color: entry.color, weight: 5, opacity: 0.15,
+          lineCap: 'round', lineJoin: 'round'
+        }).addTo(mapInstance);
+        mapLayers.routes.push(mid);
+
+        // Layer 3: Core line (코어 라인)
+        const core = L.polyline(entry.points, {
+          color: entry.color, weight: 2, opacity: 0.5,
+          lineCap: 'round', lineJoin: 'round'
+        }).addTo(mapInstance);
+        mapLayers.routes.push(core);
+
+        // 클릭 시 상세 팝업 (코어 라인에만)
+        const km = (entry.run.distance / 1000).toFixed(2);
+        const dateStr = entry.run.start_date_local ? entry.run.start_date_local.split('T')[0] : '';
+        core.bindPopup(`<div style="font-size:12px"><strong>${entry.member.name}</strong><br><strong>${entry.run.name || '러닝'}</strong><br>${km}km · ${dateStr}</div>`);
       });
 
-      // Add stat overlay
-      const stat = L.control({ position: 'bottomleft' });
-      stat.onAdd = function(map) {
-        const div = L.DomUtil.create('div', 'territory-stat');
-        div.innerHTML = `<div>총 정복 영역</div><div style="font-size:18px;color:var(--primary);margin-top:4px">${totalArea.toFixed(2)} km²</div>`;
-        return div;
-      };
-      stat.addTo(mapInstance);
-      mapLayers.territory.push(stat);
-
-      mapInstance.setView([37.5665, 126.9780], 13);
-    }
-
-    function renderOverlapMode() {
-      const { members } = dashboardData;
-      const { korea } = classifyRuns(members);
-      const bounds = L.latLngBounds([]);
-
-      // 배경 경로 (회색)
+      // 출발점 마커 (겹치는 출발점은 하나로 묶어서 깔끔하게)
+      const startPoints = {};
       korea.forEach(entry => {
-        if (entry.points.length > 0) {
-          const polyline = L.polyline(entry.points, {
-            color: '#555555', weight: 2, opacity: 0.3
-          }).addTo(mapInstance);
-          mapLayers.overlap.push(polyline);
-          entry.points.forEach(pt => bounds.extend(pt));
+        const [lat, lng] = entry.run.start_latlng || [];
+        if (!lat || !lng) return;
+        const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+        if (!startPoints[key]) {
+          startPoints[key] = { lat, lng, runs: [], colors: new Set() };
         }
+        startPoints[key].runs.push(entry);
+        startPoints[key].colors.add(entry.color);
       });
 
-      // Find and highlight overlaps
-      const overlaps = findOverlapSegments(200);
-      const overlapMap = {}; // Group by nearby overlaps
+      Object.values(startPoints).forEach(sp => {
+        const count = sp.runs.length;
+        const radius = Math.min(4 + count, 10);
+        const popupHtml = sp.runs.map(e => {
+          const km = (e.run.distance / 1000).toFixed(2);
+          return `<span style="color:${e.color}">●</span> ${e.member.name} — ${km}km`;
+        }).join('<br>');
 
-      overlaps.forEach(overlap => {
-        const key = `${overlap.point[0].toFixed(4)},${overlap.point[1].toFixed(4)}`;
-        if (!overlapMap[key]) {
-          overlapMap[key] = [];
-        }
-        overlapMap[key].push(overlap);
+        const marker = L.circleMarker([sp.lat, sp.lng], {
+          radius, fillColor: sp.runs[0].color,
+          color: 'rgba(255,255,255,0.6)', weight: 1.5,
+          opacity: 0.9, fillOpacity: 0.7
+        }).bindPopup(`<div style="font-size:12px">${popupHtml}</div>`).addTo(mapInstance);
+        mapLayers.routes.push(marker);
       });
-
-      // Draw overlap segments
-      Object.entries(overlapMap).forEach(([key, overlapGroup]) => {
-        const overlap = overlapGroup[0];
-        const members = new Set([overlap.segment1.memberName, overlap.segment2.memberName]);
-
-        const polyline = L.polyline([overlap.segment1.start, overlap.segment1.end], {
-          color: '#FFD700', // Gold
-          weight: 5,
-          opacity: 0.9,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).bindPopup(`
-          <div style="font-size:12px">
-            <strong>겹치는 코스</strong><br>
-            ${Array.from(members).join(', ')}<br>
-            ${overlap.segment1.runName || '러닝'}
-          </div>
-        `).addTo(mapInstance);
-        mapLayers.overlap.push(polyline);
-      });
-
-      if (hasRoutes && bounds.isValid()) {
-        mapInstance.fitBounds(bounds, { padding: [50, 50] });
-      } else {
-        mapInstance.setView([37.5665, 126.9780], 13);
-      }
-    }
-
-    function renderRankingMode() {
-      if (mapLayers.ranking.length > 0) {
-        mapLayers.ranking.forEach(layer => {
-          if (layer.remove) mapInstance.removeLayer(layer);
-        });
-        mapLayers.ranking = [];
-      }
-
-      // 한국 내 경로만 표시
-      const { members } = dashboardData;
-      const { korea } = classifyRuns(members);
-      const bounds = L.latLngBounds([]);
-
-      korea.forEach(entry => {
-        if (entry.points.length > 0) {
-          const polyline = L.polyline(entry.points, {
-            color: entry.color, weight: 2, opacity: 0.3,
-            lineCap: 'round', lineJoin: 'round'
-          }).addTo(mapInstance);
-          mapLayers.ranking.push(polyline);
-          entry.points.forEach(pt => bounds.extend(pt));
-        }
-      });
-
-      // Get course rankings
-      const courses = getCourseRankings(500);
-
-      // Create ranking panel
-      const rankingHtml = courses.map((course, idx) => `
-        <div class="ranking-item" style="cursor:auto">
-          <div class="ranking-item-rank">${idx + 1}순위</div>
-          <div class="ranking-item-name">${getLocationName(course.center[0], course.center[1])}</div>
-          <div class="ranking-item-count">${course.count}회</div>
-          <div class="ranking-item-members">${course.membersList}</div>
-        </div>
-      `).join('');
-
-      const control = L.control({ position: 'topright' });
-      control.onAdd = function(map) {
-        const div = L.DomUtil.create('div', 'ranking-panel');
-        div.innerHTML = `
-          <div class="ranking-header">코스 랭킹 TOP 10</div>
-          <div class="ranking-list">${rankingHtml}</div>
-        `;
-        L.DomEvent.disableClickPropagation(div);
-        return div;
-      };
-      control.addTo(mapInstance);
-      mapLayers.ranking.push(control);
 
       if (korea.length > 0 && bounds.isValid()) {
         mapInstance.fitBounds(bounds, { padding: [50, 50] });
@@ -1699,18 +1363,9 @@
           if (layer.remove) mapInstance.removeLayer(layer);
         });
       });
-      mapLayers = { routes: [], territory: [], overlap: [], ranking: [], overseas: [] };
+      mapLayers = { routes: [], overseas: [] };
 
       switch (mapMode) {
-        case 'territory':
-          renderTerritoryMode();
-          break;
-        case 'overlap':
-          renderOverlapMode();
-          break;
-        case 'ranking':
-          renderRankingMode();
-          break;
         case 'overseas':
           renderOverseasMode();
           break;
@@ -1744,10 +1399,7 @@
       // Create mode toggle buttons
       const modeHtml = `
         <div class="map-modes">
-          <button class="mode-btn active" data-mode="routes" onclick="setMapMode('routes')">경로</button>
-          <button class="mode-btn" data-mode="territory" onclick="setMapMode('territory')">영역 정복</button>
-          <button class="mode-btn" data-mode="overlap" onclick="setMapMode('overlap')">겹치는 코스</button>
-          <button class="mode-btn" data-mode="ranking" onclick="setMapMode('ranking')">코스 랭킹</button>
+          <button class="mode-btn active" data-mode="routes" onclick="setMapMode('routes')">🇰🇷 국내 경로</button>
           <button class="mode-btn" data-mode="overseas" onclick="setMapMode('overseas')">🌍 해외</button>
         </div>
       `;
