@@ -91,22 +91,28 @@ function getWeekRanges(settings) {
   const ranges = [];
   ranges.push({ start: settings.challengeStart, end: settings.firstWeekEnd });
 
-  // firstWeekEnd 다음날부터 첫 번째 월요일 찾기 (KST 기준)
-  let cur = new Date(settings.firstWeekEnd + 'T00:00:00+09:00');
-  cur.setDate(cur.getDate() + 1);
-  while (cur.getDay() !== 1) cur.setDate(cur.getDate() + 1);
+  // firstWeekEnd 다음날부터 첫 번째 월요일 찾기
+  // KST 날짜 문자열로 계산 (UTC 요일 오차 방지)
+  let curDate = new Date(settings.firstWeekEnd + 'T12:00:00+09:00'); // noon KST로 안전하게
+  curDate.setDate(curDate.getDate() + 1);
+  // KST 기준 요일 확인
+  while (true) {
+    const kstDay = new Date(curDate.getTime() + 9 * 60 * 60 * 1000).getUTCDay();
+    if (kstDay === 1) break; // 월요일
+    curDate.setDate(curDate.getDate() + 1);
+  }
 
   const todayKST = toKSTDateStr(new Date());
   const challengeEndStr = settings.challengeEnd || '2099-12-31';
   const cutoffStr = challengeEndStr < todayKST ? challengeEndStr : todayKST;
 
   while (true) {
-    const startStr = toKSTDateStr(cur);
+    const startStr = toKSTDateStr(curDate);
     if (startStr > cutoffStr) break;
-    const end = new Date(cur);
-    end.setDate(cur.getDate() + 6);
-    ranges.push({ start: startStr, end: toKSTDateStr(end) });
-    cur.setDate(cur.getDate() + 7);
+    const endDate = new Date(curDate);
+    endDate.setDate(curDate.getDate() + 6);
+    ranges.push({ start: startStr, end: toKSTDateStr(endDate) });
+    curDate.setDate(curDate.getDate() + 7);
   }
   return ranges;
 }

@@ -289,16 +289,21 @@
 
     /* ─── 데스크톱 반응형 ─── */
     @media (min-width: 768px) {
-      body { padding-bottom: 0; }
-      .header { padding: 18px 32px; }
+      body { padding-bottom: 0; display: flex; flex-direction: column; }
+      .header { padding: 18px 32px; order: 1; }
       .header-top { max-width: 1200px; margin: 0 auto; }
       .header h1 { font-size: 22px; }
+      .challenge-bar { order: 2; }
       .tab-bar {
         position: static; background: var(--bg); border-top: none;
         border-bottom: 1px solid var(--border);
         max-width: 1200px; margin: 0 auto; padding: 0 32px;
         gap: 4px; justify-content: flex-start;
+        order: 3; width: 100%;
       }
+      .stats-scroll { order: 4; }
+      .container { order: 5; }
+      .modal-overlay { order: 6; }
       .tab-item {
         flex: none; flex-direction: row; padding: 14px 20px; font-size: 14px;
         gap: 8px; border-bottom: 3px solid transparent; border-radius: 0;
@@ -408,9 +413,13 @@
     /* ─── Map Tab ─── */
     #mapContainer {
       width: 100%;
-      height: calc(100vh - 56px - 64px - 40px - 48px); /* header - tabs - filter area - mode area */
+      min-height: 400px;
+      height: calc(100dvh - 56px - 64px - 50px - 48px);
       border-radius: 0;
+      position: relative;
+      z-index: 1;
     }
+    .leaflet-container { background: var(--bg) !important; }
     .map-filter {
       padding: 12px 16px;
       display: flex;
@@ -603,8 +612,8 @@
       <span>달력</span>
     </button>
     <button class="tab-item" onclick="switchTab('penalties')" data-tab="penalties">
-      <span class="tab-icon">&#x1F4B0;</span>
-      <span>벌금</span>
+      <span class="tab-icon">&#x1F4CB;</span>
+      <span>누적 현황</span>
     </button>
     <button class="tab-item" onclick="switchTab('map')" data-tab="map">
       <span class="tab-icon">🗺️</span>
@@ -833,6 +842,11 @@
       document.querySelectorAll('.tab-item').forEach(t => {
         t.classList.toggle('active', t.dataset.tab === tab);
       });
+      // 지도 탭에서는 stats/challenge bar 숨기기 (공간 확보)
+      const statsBar = document.getElementById('statsBar');
+      const challengeBar = document.getElementById('challengeBar');
+      if (statsBar) statsBar.style.display = tab === 'map' ? 'none' : '';
+      if (challengeBar) challengeBar.style.display = tab === 'map' ? 'none' : '';
       renderContent();
     }
 
@@ -1623,15 +1637,24 @@
       const contentDiv = document.getElementById('content');
       contentDiv.innerHTML = filterHtml + modeHtml + '<div id="mapContainer"></div>';
 
-      // Initialize map on next tick
+      // Initialize map after DOM is rendered
       setTimeout(() => {
         if (mapInstance) {
           mapInstance.remove();
+          mapInstance = null;
         }
 
-        mapInstance = L.map('mapContainer').setView([37.5665, 126.9780], 13);
+        const container = document.getElementById('mapContainer');
+        if (!container) return;
+
+        // Ensure container has dimensions
+        if (container.offsetHeight < 10) {
+          container.style.height = (window.innerHeight - 220) + 'px';
+        }
+
+        mapInstance = L.map('mapContainer', { zoomControl: true }).setView([37.5665, 126.9780], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors',
+          attribution: '© OpenStreetMap',
           maxZoom: 19
         }).addTo(mapInstance);
 
@@ -1640,9 +1663,12 @@
           members.forEach(m => mapVisibleMembers.add(m.strava_id));
         }
 
-        // Render initial routes mode
-        renderMapContent();
-      }, 0);
+        // Force Leaflet to recalculate size
+        setTimeout(() => {
+          mapInstance.invalidateSize();
+          renderMapContent();
+        }, 100);
+      }, 50);
     }
 
     function toggleMapMember(stravaId, chipEl) {
