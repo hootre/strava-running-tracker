@@ -129,6 +129,7 @@ function calculatePenalties(db, settings) {
   const exemptions = db.exemptions || [];
 
   for (const member of db.members) {
+    const memberExcluded = !!member.excluded;
     const memberRuns = db.activities.filter(a => a.strava_id === member.strava_id && isRun(a));
     for (const week of weekRanges) {
       const weekRunsData = memberRuns.filter(a => {
@@ -139,11 +140,15 @@ function calculatePenalties(db, settings) {
       const totalKm = totalDistance / 1000;
       const ranPassed = totalKm >= s.requiredKm;
 
-      // 부상면제 체크
+      // 부상면제 체크 (멤버가 참가 제외 상태가 아닐 때만 의미 있음)
       const exemption = exemptions.find(
         e => e.strava_id === member.strava_id && e.week_start === week.start
       );
       const exempted = !!exemption;
+
+      // 통과 판정: 참가 제외 OR 실제 주행 통과 OR 부상면제
+      const passed = memberExcluded || ranPassed || exempted;
+      const penaltyAmount = passed ? 0 : s.penaltyAmount;
 
       newPenalties.push({
         strava_id: member.strava_id,
@@ -152,12 +157,13 @@ function calculatePenalties(db, settings) {
         run_count: weekRunsData.length,
         total_distance: totalDistance,
         total_km: Math.round(totalKm * 10) / 10,
-        passed: ranPassed || exempted,
+        passed,
+        member_excluded: memberExcluded,
         exempted,
         exemption_reason: exempted ? exemption.reason : null,
         exemption_has_image: exempted ? !!exemption.image : false,
         exemption_created_at: exempted ? exemption.created_at : null,
-        penalty_amount: (ranPassed || exempted) ? 0 : s.penaltyAmount
+        penalty_amount: penaltyAmount
       });
     }
   }
@@ -568,6 +574,9 @@ app.get('/api/dashboard', async (req, res) => {
     return {
       id: member.id, strava_id: member.strava_id, name: member.name,
       profile: member.profile, connected: !!member.access_token,
+      excluded: !!member.excluded,
+      excluded_reason: member.excluded ? (member.excluded_reason || '') : null,
+      excluded_at: member.excluded ? (member.excluded_at || null) : null,
       activities, penalties, totalPenalty, monthlyKm
     };
   });
@@ -776,6 +785,40 @@ app.get('/api/exemption-image', async (req, res) => {
   res.setHeader('Content-Type', m[1]);
   res.setHeader('Cache-Control', 'private, max-age=600');
   res.send(buf);
+});
+
+// ============================================================
+// API: 멤버 참가 제외 / 복귀 (참가인원 제외 시 모든 주차 벌금 0 처리)
+// ============================================================
+app.post('/api/member-exclusion', async (req, res) => {
+  const { strava_id, excluded, reason } = req.body;
+  if (!strava_id) return res.status(400).json({ error: 'strava_id가 필요합니다' });
+
+  const db = await loadDB();
+  const sid = Number(strava_id);
+  const idx = db.members.findIndex(m => m.strava_id === sid);
+  if (idx < 0) return res.status(404).json({ error: '등록되지 않은 멤버입니다' });
+
+  if (excluded === false) {
+    // 복귀
+    db.members[idx].excluded = false;
+    db.members[idx].excluded_reason = null;
+    db.members[idx].excluded_at = null;
+  } else {
+    // 제외 처리 (사유 필수)
+    const trimmedReason = (reason || '').trim();
+    if (!trimmedReason) return res.status(400).json({ error: '제외 사유를 입력해주세요' });
+    if (trimmedReason.length > 500) return res.status(400).json({ error: '사유는 500자 이내로 입력해주세요' });
+
+    db.members[idx].excluded = true;
+    db.members[idx].excluded_reason = trimmedReason.slice(0, 500);
+    db.members[idx].excluded_at = new Date().toISOString();
+  }
+
+  const settings = getSettings(db);
+  calculatePenalties(db, settings);
+  await saveDB(db);
+  res.json({ ok: true, excluded: !!db.members[idx].excluded });
 });
 
 // ============================================================
@@ -1064,7 +1107,6 @@ app.get('/api/marathon-detail', async (req, res) => {
         .replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
     };
 
-    // 기타소개 (HTML 유지해서 줄바꿈 보존)
     const descMatch = html.match(/기타소개<\/p>[\s\S]*?<td[^>]*bgcolor="white"[^>]*>\s*<p>([\s\S]*?)<\/p>\s*<\/td>/i);
     let description = '';
     if (descMatch) {
@@ -1076,16 +1118,13 @@ app.get('/api/marathon-detail', async (req, res) => {
         .trim();
     }
 
-    // 홈페이지 URL 추출
     const hpMatch = html.match(/홈페이지<\/p>[\s\S]*?<a href="([^"]+)"/i);
     const homepage = hpMatch ? hpMatch[1] : '';
 
-    // 지도 좌표 추출
     const coordMatch = html.match(/LatLng\(([\d.]+),\s*([\d.]+)\)/);
     const lat = coordMatch ? parseFloat(coordMatch[1]) : null;
     const lng = coordMatch ? parseFloat(coordMatch[2]) : null;
 
-    // 주소 추출 (infowindow content)
     const addrMatch = html.match(/iw_inner[\s\S]*?'([^']+)'/);
     const address = addrMatch ? addrMatch[1].trim() : '';
 
