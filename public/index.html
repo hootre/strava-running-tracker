@@ -1492,7 +1492,7 @@
       openExemptModal(`
         <div class="modal-title">🩹 ${member.name} - 부상면제 신청</div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
-          이미지(진단서/처방전/병원 영수증 등)와 사유를 함께 제출해주세요.<br>
+          사유는 필수, 증빙 이미지(진단서/처방전/병원 영수증 등)는 선택입니다.<br>
           신청 즉시 해당 주차 상태가 <strong style="color:#60A5FA">부상면제</strong>로 바뀌며 벌금에서 제외됩니다.
         </div>
         <div class="form-field">
@@ -1500,11 +1500,11 @@
           <select id="exemptWeek">${optionsHtml}</select>
         </div>
         <div class="form-field">
-          <label>사유 (최대 500자)</label>
+          <label>사유 <span style="color:var(--danger)">*</span> (최대 500자)</label>
           <textarea id="exemptReason" maxlength="500" placeholder="예: 발목 인대 손상으로 1주 안정 가료 진단"></textarea>
         </div>
         <div class="form-field">
-          <label>증빙 이미지 (PNG/JPG/WEBP, 자동 압축)</label>
+          <label>증빙 이미지 <span style="color:var(--text-muted);font-weight:400">(선택, PNG/JPG/WEBP, 자동 압축)</span></label>
           <input type="file" id="exemptImage" accept="image/png,image/jpeg,image/webp" onchange="previewExemptImage(event)">
           <img id="exemptPreview" class="image-preview" style="display:none" alt="미리보기">
         </div>
@@ -1546,20 +1546,20 @@
       const reason = document.getElementById('exemptReason').value.trim();
       if (!week) { showToast('주차를 선택해주세요', 'error'); return; }
       if (!reason) { showToast('사유를 입력해주세요', 'error'); return; }
-      if (!_exemptImageData) { showToast('증빙 이미지를 첨부해주세요', 'error'); return; }
 
       const btn = document.getElementById('exemptSubmitBtn');
       btn.disabled = true; btn.textContent = '신청 중...';
       try {
+        const payload = {
+          strava_id: stravaId,
+          week_start: week,
+          reason
+        };
+        if (_exemptImageData) payload.image = _exemptImageData;
         const res = await fetch('/api/exemption', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            strava_id: stravaId,
-            week_start: week,
-            reason,
-            image: _exemptImageData
-          })
+          body: JSON.stringify(payload)
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || '신청 실패');
@@ -1584,7 +1584,14 @@
       }
       const weekLabel = `${weekStart.slice(5).replace('-','/')} ~ ${(p.week_end || '').slice(5).replace('-','/')}`;
       const created = p.exemption_created_at ? new Date(p.exemption_created_at).toLocaleString('ko-KR') : '';
+      const hasImage = !!p.exemption_has_image;
       const imgUrl = `/api/exemption-image?strava_id=${stravaId}&week_start=${encodeURIComponent(weekStart)}&t=${Date.now()}`;
+
+      const imageBlock = hasImage
+        ? `<div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">증빙 이미지</div>
+           <img src="${imgUrl}" class="exempt-detail-img" alt="증빙" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+           <div style="display:none;color:var(--danger);font-size:13px;text-align:center;padding:20px">이미지를 불러올 수 없습니다</div>`
+        : `<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:14px;background:var(--bg);border-radius:10px;margin-bottom:8px">증빙 이미지 없음</div>`;
 
       openExemptModal(`
         <div class="modal-title">🩹 부상면제 - ${member.name}</div>
@@ -1597,9 +1604,7 @@
           <div style="color:var(--text-muted);font-size:11px;margin-bottom:6px">사유</div>
           <div style="font-size:14px;line-height:1.5;white-space:pre-wrap">${(p.exemption_reason || '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>
         </div>
-        <div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">증빙 이미지</div>
-        <img src="${imgUrl}" class="exempt-detail-img" alt="증빙" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-        <div style="display:none;color:var(--danger);font-size:13px;text-align:center;padding:20px">이미지를 불러올 수 없습니다</div>
+        ${imageBlock}
         <div class="modal-btn-row">
           <button class="modal-btn modal-btn-secondary" onclick="closeExemptModal()">닫기</button>
           <button class="modal-btn modal-btn-danger" onclick="cancelExemption(${stravaId}, '${weekStart}')">면제 취소</button>

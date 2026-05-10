@@ -155,6 +155,7 @@ function calculatePenalties(db, settings) {
         passed: ranPassed || exempted,
         exempted,
         exemption_reason: exempted ? exemption.reason : null,
+        exemption_has_image: exempted ? !!exemption.image : false,
         exemption_created_at: exempted ? exemption.created_at : null,
         penalty_amount: (ranPassed || exempted) ? 0 : s.penaltyAmount
       });
@@ -670,18 +671,18 @@ app.delete('/api/members/:stravaId', async (req, res) => {
 // ============================================================
 app.post('/api/exemption', async (req, res) => {
   const { strava_id, week_start, reason, image } = req.body;
-  if (!strava_id || !week_start || !reason || !image) {
-    return res.status(400).json({ error: '필수 항목이 누락되었습니다 (strava_id, week_start, reason, image)' });
+  if (!strava_id || !week_start || !reason) {
+    return res.status(400).json({ error: '필수 항목이 누락되었습니다 (strava_id, week_start, reason)' });
   }
 
-  // 이미지 형식 검증
-  if (!/^data:image\/(png|jpe?g|webp);base64,/.test(image)) {
-    return res.status(400).json({ error: '이미지 형식이 올바르지 않습니다 (PNG/JPG/WEBP만 허용)' });
-  }
-
-  // 이미지 크기 검증 (base64는 원본 대비 약 1.37배)
-  if (image.length > 5 * 1024 * 1024) {
-    return res.status(413).json({ error: '이미지 크기가 너무 큽니다 (최대 약 3.5MB)' });
+  // 이미지는 선택사항. 첨부됐을 때만 형식/크기 검증.
+  if (image) {
+    if (!/^data:image\/(png|jpe?g|webp);base64,/.test(image)) {
+      return res.status(400).json({ error: '이미지 형식이 올바르지 않습니다 (PNG/JPG/WEBP만 허용)' });
+    }
+    if (image.length > 5 * 1024 * 1024) {
+      return res.status(413).json({ error: '이미지 크기가 너무 큽니다 (최대 약 3.5MB)' });
+    }
   }
 
   // 사유 길이 제한
@@ -713,7 +714,7 @@ app.post('/api/exemption', async (req, res) => {
     week_start: weekRange.start,
     week_end: weekRange.end,
     reason: trimmedReason.slice(0, 500),
-    image,
+    image: image || null,
     created_at: existingIdx >= 0 ? (db.exemptions[existingIdx].created_at || new Date().toISOString()) : new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
