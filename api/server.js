@@ -778,6 +778,80 @@ app.get('/api/exemption-image', async (req, res) => {
 });
 
 // ============================================================
+// API: 관리자 - Redis 메인/백업 키 상태 점검
+// ============================================================
+app.post('/api/admin/redis-status', async (req, res) => {
+  const { password } = req.body;
+  const adminPw = process.env.ADMIN_PASSWORD || 'bora1234';
+  if (password !== adminPw) return res.status(403).json({ error: '비밀번호 오류' });
+
+  const redisUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!redisUrl || !redisToken) {
+    return res.status(400).json({ error: 'Redis가 설정되지 않았습니다' });
+  }
+
+  try {
+    const { Redis } = require('@upstash/redis');
+    const r = new Redis({ url: redisUrl, token: redisToken });
+    const summarize = (data) => {
+      if (!data || typeof data !== 'object') return { exists: false };
+      return {
+        exists: true,
+        memberCount: Array.isArray(data.members) ? data.members.length : 0,
+        activityCount: Array.isArray(data.activities) ? data.activities.length : 0,
+        exemptionCount: Array.isArray(data.exemptions) ? data.exemptions.length : 0,
+        members: (data.members || []).map(m => ({ name: m.name, strava_id: m.strava_id }))
+      };
+    };
+    const main = await r.get('running-tracker');
+    const backup = await r.get('running-tracker-backup');
+    res.json({
+      main: summarize(main),
+      backup: summarize(backup)
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================
+// API: 관리자 - 백업 키에서 메인 키로 강제 복구
+// ============================================================
+app.post('/api/admin/restore-from-backup', async (req, res) => {
+  const { password, confirm } = req.body;
+  const adminPw = process.env.ADMIN_PASSWORD || 'bora1234';
+  if (password !== adminPw) return res.status(403).json({ error: '비밀번호 오류' });
+  if (confirm !== 'RESTORE') return res.status(400).json({ error: '안전 확인 코드가 필요합니다 (confirm: "RESTORE")' });
+
+  const redisUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!redisUrl || !redisToken) {
+    return res.status(400).json({ error: 'Redis가 설정되지 않았습니다' });
+  }
+
+  try {
+    const { Redis } = require('@upstash/redis');
+    const r = new Redis({ url: redisUrl, token: redisToken });
+    const backup = await r.get('running-tracker-backup');
+    if (!backup || !Array.isArray(backup.members) || backup.members.length === 0) {
+      return res.status(404).json({ error: '백업 키에 복구 가능한 데이터가 없습니다', backup });
+    }
+    await r.set('running-tracker', backup);
+    res.json({
+      ok: true,
+      restored: {
+        memberCount: backup.members.length,
+        activityCount: (backup.activities || []).length,
+        exemptionCount: (backup.exemptions || []).length
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================
 // API: 디버그
 // ============================================================
 app.get('/api/debug', async (req, res) => {
@@ -1037,28 +1111,3 @@ app.get('/api/marathon-detail', async (req, res) => {
 });
 
 module.exports = app;
-
-// test
-('대회명'),
-      representative: extract('대표자명'),
-      email: extract('E-mail'),
-      datetime: extract('대회일시'),
-      phone: extract('전화번호'),
-      categories: extract('대회종목'),
-      region: extract('대회지역'),
-      place: extract('대회장소'),
-      organizer: extract('주최단체'),
-      registrationPeriod: extract('접수기간'),
-      homepage,
-      description,
-      address,
-      lat, lng
-    });
-  } catch (err) {
-    console.error('Marathon detail error:', err.message);
-    res.status(500).json({ error: '상세 정보를 불러올 수 없습니다' });
-  }
-});
-
-module.exports = app;
-odule.exports = app;
