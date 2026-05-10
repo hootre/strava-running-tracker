@@ -5,7 +5,8 @@ const { loadDB, saveDB, DEFAULT_SETTINGS } = require('../lib/db');
 const { exchangeToken, refreshAccessToken, getActivities } = require('../lib/strava');
 
 const app = express();
-app.use(express.json());
+// 부상면제 이미지 업로드를 위해 6mb까지 허용
+app.use(express.json({ limit: '6mb' }));
 
 // ============================================================
 // 보안 확인
@@ -125,6 +126,7 @@ function calculatePenalties(db, settings) {
   const s = settings || getSettings(db);
   const newPenalties = [];
   const weekRanges = getWeekRanges(s);
+  const exemptions = db.exemptions || [];
 
   for (const member of db.members) {
     const memberRuns = db.activities.filter(a => a.strava_id === member.strava_id && isRun(a));
@@ -135,7 +137,14 @@ function calculatePenalties(db, settings) {
       });
       const totalDistance = weekRunsData.reduce((sum, a) => sum + (a.distance || 0), 0);
       const totalKm = totalDistance / 1000;
-      const passed = totalKm >= s.requiredKm;
+      const ranPassed = totalKm >= s.requiredKm;
+
+      // 부상면제 체크
+      const exemption = exemptions.find(
+        e => e.strava_id === member.strava_id && e.week_start === week.start
+      );
+      const exempted = !!exemption;
+
       newPenalties.push({
         strava_id: member.strava_id,
         week_start: week.start,
@@ -143,8 +152,11 @@ function calculatePenalties(db, settings) {
         run_count: weekRunsData.length,
         total_distance: totalDistance,
         total_km: Math.round(totalKm * 10) / 10,
-        passed,
-        penalty_amount: passed ? 0 : s.penaltyAmount
+        passed: ranPassed || exempted,
+        exempted,
+        exemption_reason: exempted ? exemption.reason : null,
+        exemption_created_at: exempted ? exemption.created_at : null,
+        penalty_amount: (ranPassed || exempted) ? 0 : s.penaltyAmount
       });
     }
   }
@@ -635,6 +647,118 @@ app.delete('/api/members/:stravaId', async (req, res) => {
   db.subscriptions = (db.subscriptions || []).filter(s => s.strava_id !== sid);
   await saveDB(db);
   res.json({ ok: true });
+});
+
+// ============================================================
+// API: 부상면제 신청 (본인 신청 + 즉시 적용)
+// ============================================================
+app.post('/api/exemption', async (req, res) => {
+  const { strava_id, week_start, reason, image } = req.body;
+  if (!strava_id || !week_start || !reason || !image) {
+    return res.status(400).json({ error: '필수 항목이 누락되었습니다 (strava_id, week_start, reason, image)' });
+  }
+
+  // 이미지 형식 검증
+  if (!/^data:image\/(png|jpe?g|webp);base64,/.test(image)) {
+    return res.status(400).json({ error: '이미지 형식이 올바르지 않습니다 (PNG/JPG/WEBP만 허용)' });
+  }
+
+  // 이미지 크기 검증 (base64는 원본 대비 약 1.37배)
+  if (image.length > 5 * 1024 * 1024) {
+    return res.status(413).json({ error: '이미지 크기가 너무 큽니다 (최대 약 3.5MB)' });
+  }
+
+  // 사유 길이 제한
+  const trimmedReason = String(reason).trim();
+  if (!trimmedReason) return res.status(400).json({ error: '사유를 입력해주세요' });
+  if (trimmedReason.length > 500) return res.status(400).json({ error: '사유는 500자 이내로 입력해주세요' });
+
+  const db = await loadDB();
+  const sid = Number(strava_id);
+
+  // 멤버 존재 확인
+  if (!db.members.find(m => m.strava_id === sid)) {
+    return res.status(404).json({ error: '등록되지 않은 멤버입니다' });
+  }
+
+  // 주차 유효성 검증 (현재까지 진행된 주차만 허용)
+  const settings = getSettings(db);
+  const validWeeks = getWeekRanges(settings);
+  const weekRange = validWeeks.find(w => w.start === week_start);
+  if (!weekRange) return res.status(400).json({ error: '유효하지 않은 주차입니다' });
+
+  if (!db.exemptions) db.exemptions = [];
+
+  const existingIdx = db.exemptions.findIndex(
+    e => e.strava_id === sid && e.week_start === weekRange.start
+  );
+  const exemptionData = {
+    strava_id: sid,
+    week_start: weekRange.start,
+    week_end: weekRange.end,
+    reason: trimmedReason.slice(0, 500),
+    image,
+    created_at: existingIdx >= 0 ? (db.exemptions[existingIdx].created_at || new Date().toISOString()) : new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (existingIdx >= 0) {
+    db.exemptions[existingIdx] = exemptionData;
+  } else {
+    db.exemptions.push(exemptionData);
+  }
+
+  calculatePenalties(db, settings);
+  await saveDB(db);
+  res.json({ ok: true, updated: existingIdx >= 0 });
+});
+
+// ============================================================
+// API: 부상면제 취소
+// ============================================================
+app.delete('/api/exemption', async (req, res) => {
+  const { strava_id, week_start } = req.body;
+  if (!strava_id || !week_start) {
+    return res.status(400).json({ error: 'strava_id, week_start가 필요합니다' });
+  }
+
+  const db = await loadDB();
+  const sid = Number(strava_id);
+  const before = (db.exemptions || []).length;
+  db.exemptions = (db.exemptions || []).filter(
+    e => !(e.strava_id === sid && e.week_start === week_start)
+  );
+  const removed = before !== db.exemptions.length;
+
+  if (removed) {
+    const settings = getSettings(db);
+    calculatePenalties(db, settings);
+    await saveDB(db);
+  }
+  res.json({ ok: true, removed });
+});
+
+// ============================================================
+// API: 부상면제 이미지 조회 (대시보드 페이로드 경량화 목적)
+// ============================================================
+app.get('/api/exemption-image', async (req, res) => {
+  const { strava_id, week_start } = req.query;
+  if (!strava_id || !week_start) return res.status(400).send('필수 파라미터 누락');
+
+  const db = await loadDB();
+  const sid = Number(strava_id);
+  const exemption = (db.exemptions || []).find(
+    e => e.strava_id === sid && e.week_start === week_start
+  );
+  if (!exemption || !exemption.image) return res.status(404).send('not found');
+
+  const m = exemption.image.match(/^data:(image\/[a-z]+);base64,(.+)$/);
+  if (!m) return res.status(500).send('invalid image data');
+
+  const buf = Buffer.from(m[2], 'base64');
+  res.setHeader('Content-Type', m[1]);
+  res.setHeader('Cache-Control', 'private, max-age=600');
+  res.send(buf);
 });
 
 // ============================================================

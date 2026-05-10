@@ -208,6 +208,58 @@
     .status-pass { background: rgba(34,197,94,0.15); color: var(--success); }
     .status-fail { background: rgba(239,68,68,0.15); color: var(--danger); }
     .status-ongoing { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .status-exempt { background: rgba(96,165,250,0.18); color: #60A5FA; }
+
+    /* ─── 부상면제 ─── */
+    .exempt-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(96,165,250,0.18); color: #60A5FA;
+      padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+      cursor: pointer;
+    }
+    .exempt-action-row {
+      display: flex; gap: 8px; margin-top: 12px; padding-top: 12px;
+      border-top: 1px dashed var(--border);
+    }
+    .btn-exempt {
+      flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #60A5FA;
+      background: rgba(96,165,250,0.1); color: #60A5FA;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .btn-exempt:active { background: rgba(96,165,250,0.2); }
+    .btn-exempt-cancel {
+      background: rgba(239,68,68,0.1); border-color: var(--danger); color: var(--danger);
+    }
+    .form-field { margin-bottom: 14px; }
+    .form-field label { display:block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+    .form-field select,
+    .form-field textarea,
+    .form-field input[type="file"] {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 14px; outline: none;
+      font-family: inherit;
+    }
+    .form-field textarea { min-height: 84px; resize: vertical; }
+    .form-field select:focus, .form-field textarea:focus { border-color: var(--primary); }
+    .image-preview {
+      max-width: 100%; max-height: 200px; border-radius: 10px;
+      margin-top: 8px; display: block; object-fit: contain;
+      background: var(--bg);
+    }
+    .exempt-detail-img {
+      width: 100%; max-height: 360px; border-radius: 12px;
+      object-fit: contain; background: var(--bg); margin: 12px 0;
+    }
+    .modal-btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    .modal-btn {
+      flex: 1; padding: 12px; border-radius: 10px; border: none;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .modal-btn-primary { background: var(--primary); color: white; }
+    .modal-btn-primary:disabled { background: var(--bg-hover); color: var(--text-muted); cursor: not-allowed; }
+    .modal-btn-secondary { background: var(--bg-hover); color: var(--text); }
+    .modal-btn-danger { background: var(--danger); color: white; }
 
     /* ─── 미니 달력 ─── */
     .mini-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
@@ -879,6 +931,14 @@
     </div>
   </div>
 
+  <!-- 부상면제 모달 (신청/상세 공용) -->
+  <div class="modal-overlay" id="exemptModal" onclick="closeExemptModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div id="exemptModalContent"></div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
@@ -1135,6 +1195,8 @@
       const { members, settings } = dashboardData;
       const now = new Date();
       const weekStartStr = getCurrentWeekStart(now);
+      const me = getMyInfo();
+      const myStravaId = me?.sid ? String(me.sid) : null;
 
       // ★ 이번 달 km 기준으로 정렬 (내림차순)
       const sorted = [...members].sort((a, b) => (b.monthlyKm || 0) - (a.monthlyKm || 0));
@@ -1148,16 +1210,30 @@
         const wp = m.penalties.find(p => p.week_start === weekStartStr);
         const weekKm = wp ? (wp.total_km || 0) : 0;
         const monthlyKm = m.monthlyKm || 0;
-        const pct = Math.min((weekKm / settings.requiredKm) * 100, 100);
-        const ringColor = pct >= 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+        const isExempted = !!wp?.exempted;
+        const pct = isExempted ? 100 : Math.min((weekKm / settings.requiredKm) * 100, 100);
+        const ringColor = isExempted ? '#60A5FA'
+          : pct >= 100 ? 'var(--success)'
+          : pct >= 50 ? 'var(--warning)'
+          : 'var(--danger)';
         const offset = circ - (pct / 100) * circ;
 
         let stTxt, stCls;
-        if (wp?.passed) { stTxt = '통과 ✓'; stCls = 'status-pass'; }
+        if (isExempted) { stTxt = '🩹 부상면제'; stCls = 'status-exempt'; }
+        else if (wp?.passed) { stTxt = '통과 ✓'; stCls = 'status-pass'; }
         else { stTxt = '진행중'; stCls = 'status-ongoing'; }
 
         const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
         const cal = buildMiniCalendar(m, now.getFullYear(), now.getMonth());
+
+        const isMine = myStravaId && String(m.strava_id) === myStravaId;
+        const exemptActions = isMine ? `
+              <div class="exempt-action-row">
+                ${isExempted
+                  ? `<button class="btn-exempt" onclick="event.stopPropagation();showExemptionDetail(${m.strava_id}, '${weekStartStr}')">🩹 이번 주 부상면제 보기/취소</button>`
+                  : `<button class="btn-exempt" onclick="event.stopPropagation();openExemptionRequest(${m.strava_id})">🩹 부상면제 신청</button>`
+                }
+              </div>` : '';
 
         html += `
           <div class="member-card" id="card-${i}">
@@ -1167,7 +1243,7 @@
                 ${m.profile ? `<img class="member-avatar" src="${m.profile}" alt="">` : ''}
                 ${m.name || 'User'}
               </span>
-              <span class="member-status ${stCls}">${stTxt}</span>
+              <span class="member-status ${stCls}"${isExempted ? ` onclick="event.stopPropagation();showExemptionDetail(${m.strava_id}, '${weekStartStr}')" style="cursor:pointer"` : ''}>${stTxt}</span>
             </div>
             <div class="member-summary" onclick="toggleCard(${i})">
               <div class="summary-left">
@@ -1178,12 +1254,12 @@
                       stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="round"/>
                   </svg>
                   <div class="ring-text">
-                    <span class="ring-km" style="color:${ringColor}">${weekKm}</span>
-                    <span class="ring-unit">km</span>
+                    <span class="ring-km" style="color:${ringColor}">${isExempted ? '🩹' : weekKm}</span>
+                    <span class="ring-unit">${isExempted ? '면제' : 'km'}</span>
                   </div>
                 </div>
                 <div class="summary-info">
-                  <div class="summary-week">이번 주 <strong>${weekKm}/${settings.requiredKm}km</strong></div>
+                  <div class="summary-week">이번 주 <strong>${weekKm}/${settings.requiredKm}km</strong>${isExempted ? ' <span style="color:#60A5FA;font-size:11px">(면제)</span>' : ''}</div>
                   <div class="summary-month">&#x1F4C5; 이번 달 <strong style="color:var(--primary)">${monthlyKm}km</strong></div>
                   <div class="summary-penalty">${m.totalPenalty > 0 ? `&#x26A0;&#xFE0F; 누적 벌금 ${(m.totalPenalty/10000).toFixed(0)}만원` : '&#x2705; 벌금 없음'}</div>
                 </div>
@@ -1199,6 +1275,7 @@
                   <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.4)"></div>5km미만</div>
                   <div class="legend-item"><div class="legend-dot" style="border:2px solid var(--primary);width:6px;height:6px"></div>오늘</div>
                 </div>
+                ${exemptActions}
               </div>
             </div>
           </div>`;
@@ -1324,6 +1401,225 @@
     function closeModal(e) {
       if (e.target === document.getElementById('runModal')) {
         document.getElementById('runModal').classList.remove('show');
+      }
+    }
+
+    // ============================================================
+    // 부상면제 (신청 / 취소 / 상세보기)
+    // ============================================================
+    function closeExemptModal(e) {
+      const overlay = document.getElementById('exemptModal');
+      if (!e || e.target === overlay) overlay.classList.remove('show');
+    }
+
+    function openExemptModal(html) {
+      document.getElementById('exemptModalContent').innerHTML = html;
+      document.getElementById('exemptModal').classList.add('show');
+    }
+
+    // 클라이언트 사이드 이미지 압축 (max 1080px, JPEG 0.8)
+    async function compressImage(file, maxDim = 1080, quality = 0.82) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('이미지 읽기 실패'));
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('이미지 디코딩 실패'));
+          img.onload = () => {
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              if (width >= height) {
+                height = Math.round(height * maxDim / width);
+                width = maxDim;
+              } else {
+                width = Math.round(width * maxDim / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            try {
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            } catch (err) { reject(err); }
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 신청 가능 주차 목록 (이번 주차 포함, 과거~현재만)
+    function getEligibleWeeks() {
+      if (!dashboardData || !dashboardData.members.length) return [];
+      const all = new Set();
+      const me = getMyInfo();
+      const myMember = dashboardData.members.find(m => String(m.strava_id) === String(me?.sid));
+      if (!myMember) return [];
+      myMember.penalties.forEach(p => all.add(p.week_start + '|' + p.week_end));
+      return [...all].sort().reverse().map(s => {
+        const [start, end] = s.split('|');
+        return { start, end };
+      });
+    }
+
+    function openExemptionRequest(stravaId) {
+      const me = getMyInfo();
+      if (!me || !me.sid) {
+        showToast('먼저 Strava 연결이 필요합니다', 'error'); return;
+      }
+      if (String(me.sid) !== String(stravaId)) {
+        showToast('본인 계정만 신청할 수 있습니다', 'error'); return;
+      }
+      const weeks = getEligibleWeeks();
+      if (!weeks.length) { showToast('신청 가능한 주차가 없습니다', 'error'); return; }
+      const currentWs = getCurrentWeekStart(new Date());
+
+      const optionsHtml = weeks.map(w => {
+        const label = `${w.start.slice(5).replace('-','/')} ~ ${w.end.slice(5).replace('-','/')}`;
+        const isCur = w.start === currentWs ? ' (이번 주)' : '';
+        const sel = w.start === currentWs ? ' selected' : '';
+        return `<option value="${w.start}"${sel}>${label}${isCur}</option>`;
+      }).join('');
+
+      openExemptModal(`
+        <div class="modal-title">🩹 부상면제 신청</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
+          이미지(진단서/처방전/병원 영수증 등)와 사유를 함께 제출해주세요.<br>
+          신청 즉시 해당 주차 상태가 <strong style="color:#60A5FA">부상면제</strong>로 바뀌며 벌금에서 제외됩니다.
+        </div>
+        <div class="form-field">
+          <label>대상 주차</label>
+          <select id="exemptWeek">${optionsHtml}</select>
+        </div>
+        <div class="form-field">
+          <label>사유 (최대 500자)</label>
+          <textarea id="exemptReason" maxlength="500" placeholder="예: 발목 인대 손상으로 1주 안정 가료 진단"></textarea>
+        </div>
+        <div class="form-field">
+          <label>증빙 이미지 (PNG/JPG/WEBP, 자동 압축)</label>
+          <input type="file" id="exemptImage" accept="image/png,image/jpeg,image/webp" onchange="previewExemptImage(event)">
+          <img id="exemptPreview" class="image-preview" style="display:none" alt="미리보기">
+        </div>
+        <div class="modal-btn-row">
+          <button class="modal-btn modal-btn-secondary" onclick="closeExemptModal()">취소</button>
+          <button class="modal-btn modal-btn-primary" id="exemptSubmitBtn" onclick="submitExemption(${stravaId})">신청하기</button>
+        </div>
+      `);
+    }
+
+    let _exemptImageData = null;
+    async function previewExemptImage(e) {
+      const file = e.target.files?.[0];
+      const preview = document.getElementById('exemptPreview');
+      _exemptImageData = null;
+      if (!file) { preview.style.display = 'none'; return; }
+      if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+        showToast('PNG/JPG/WEBP 이미지만 업로드 가능합니다', 'error');
+        e.target.value = ''; preview.style.display = 'none'; return;
+      }
+      // 원본 10MB 이내만 허용 (압축 후 더 작아짐)
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('이미지 원본이 너무 큽니다 (10MB 이하)', 'error');
+        e.target.value = ''; preview.style.display = 'none'; return;
+      }
+      try {
+        const dataUrl = await compressImage(file);
+        _exemptImageData = dataUrl;
+        preview.src = dataUrl;
+        preview.style.display = 'block';
+      } catch (err) {
+        showToast('이미지 처리 실패: ' + err.message, 'error');
+        e.target.value = ''; preview.style.display = 'none';
+      }
+    }
+
+    async function submitExemption(stravaId) {
+      const week = document.getElementById('exemptWeek').value;
+      const reason = document.getElementById('exemptReason').value.trim();
+      if (!week) { showToast('주차를 선택해주세요', 'error'); return; }
+      if (!reason) { showToast('사유를 입력해주세요', 'error'); return; }
+      if (!_exemptImageData) { showToast('증빙 이미지를 첨부해주세요', 'error'); return; }
+
+      const btn = document.getElementById('exemptSubmitBtn');
+      btn.disabled = true; btn.textContent = '신청 중...';
+      try {
+        const res = await fetch('/api/exemption', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            strava_id: stravaId,
+            week_start: week,
+            reason,
+            image: _exemptImageData
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '신청 실패');
+        showToast(data.updated ? '부상면제가 갱신되었습니다' : '부상면제가 등록되었습니다', 'success');
+        _exemptImageData = null;
+        closeExemptModal();
+        await fetchDashboard();
+        render();
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false; btn.textContent = '신청하기';
+      }
+    }
+
+    function showExemptionDetail(stravaId, weekStart) {
+      if (!dashboardData) return;
+      const member = dashboardData.members.find(m => String(m.strava_id) === String(stravaId));
+      if (!member) return;
+      const p = member.penalties.find(p => p.week_start === weekStart);
+      if (!p || !p.exempted) {
+        showToast('부상면제 정보가 없습니다', 'error'); return;
+      }
+      const me = getMyInfo();
+      const isMine = me && String(me.sid) === String(stravaId);
+      const weekLabel = `${weekStart.slice(5).replace('-','/')} ~ ${(p.week_end || '').slice(5).replace('-','/')}`;
+      const created = p.exemption_created_at ? new Date(p.exemption_created_at).toLocaleString('ko-KR') : '';
+      const imgUrl = `/api/exemption-image?strava_id=${stravaId}&week_start=${encodeURIComponent(weekStart)}&t=${Date.now()}`;
+
+      openExemptModal(`
+        <div class="modal-title">🩹 부상면제 - ${member.name}</div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:12px">
+          <div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">대상 주차</div>
+          <div style="font-weight:700">${weekLabel}</div>
+          ${created ? `<div style="color:var(--text-muted);font-size:11px;margin-top:8px">신청 일시: ${created}</div>` : ''}
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+          <div style="color:var(--text-muted);font-size:11px;margin-bottom:6px">사유</div>
+          <div style="font-size:14px;line-height:1.5;white-space:pre-wrap">${(p.exemption_reason || '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>
+        </div>
+        <div style="color:var(--text-muted);font-size:11px;margin-bottom:4px">증빙 이미지</div>
+        <img src="${imgUrl}" class="exempt-detail-img" alt="증빙" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+        <div style="display:none;color:var(--danger);font-size:13px;text-align:center;padding:20px">이미지를 불러올 수 없습니다</div>
+        <div class="modal-btn-row">
+          <button class="modal-btn modal-btn-secondary" onclick="closeExemptModal()">닫기</button>
+          ${isMine ? `<button class="modal-btn modal-btn-danger" onclick="cancelExemption(${stravaId}, '${weekStart}')">면제 취소</button>` : ''}
+        </div>
+      `);
+    }
+
+    async function cancelExemption(stravaId, weekStart) {
+      if (!confirm('해당 주차의 부상면제를 취소하시겠어요?\n실제 주행거리에 따라 벌금이 다시 부과됩니다.')) return;
+      try {
+        const res = await fetch('/api/exemption', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ strava_id: stravaId, week_start: weekStart })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '취소 실패');
+        showToast('부상면제가 취소되었습니다', 'success');
+        closeExemptModal();
+        await fetchDashboard();
+        render();
+      } catch (err) {
+        showToast(err.message, 'error');
       }
     }
 
@@ -2310,10 +2606,17 @@
         for (const m of weekMembers) {
           const p = m.penalties.find(p => p.week_start === w);
           if (!p) continue;
-          const barPct = Math.min((p.total_km / 20) * 100, 100);
-          const barColor = p.passed ? 'var(--success)' : p.total_km >= 10 ? 'var(--warning)' : 'var(--danger)';
-          const statusIcon = p.passed ? '✅' : '❌';
-          const penaltyTxt = p.passed ? '' : `<span style="color:var(--danger);font-size:11px;font-weight:700">-${(p.penalty_amount/10000).toFixed(0)}만원</span>`;
+          const isExempt = !!p.exempted;
+          const barPct = isExempt ? 100 : Math.min((p.total_km / 20) * 100, 100);
+          const barColor = isExempt ? '#60A5FA'
+            : p.passed ? 'var(--success)'
+            : p.total_km >= 10 ? 'var(--warning)'
+            : 'var(--danger)';
+          const statusIcon = isExempt ? '🩹' : (p.passed ? '✅' : '❌');
+          const penaltyTxt = (p.passed || isExempt) ? '' : `<span style="color:var(--danger);font-size:11px;font-weight:700">-${(p.penalty_amount/10000).toFixed(0)}만원</span>`;
+          const exemptBadge = isExempt
+            ? `<span class="exempt-badge" onclick="event.stopPropagation();showExemptionDetail(${m.strava_id}, '${w}')">부상면제</span>`
+            : '';
 
           html += `
               <div style="background:var(--bg);border-radius:10px;padding:10px 14px">
@@ -2321,6 +2624,7 @@
                   <div style="display:flex;align-items:center;gap:8px">
                     ${m.profile ? `<img style="width:24px;height:24px;border-radius:50%;object-fit:cover" src="${m.profile}" alt="">` : ''}
                     <span style="font-size:13px;font-weight:600">${m.name}</span>
+                    ${exemptBadge}
                   </div>
                   <div style="display:flex;align-items:center;gap:6px">
                     <span style="font-size:13px;font-weight:800;color:${barColor}">${p.total_km}km</span>
