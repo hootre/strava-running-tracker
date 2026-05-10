@@ -533,8 +533,11 @@ app.post('/api/sync', async (req, res) => {
 
 // ============================================================
 // API: 대시보드
+// summary_polyline은 활동당 1KB+ 크기에 지도 탭에서만 쓰이므로
+// 기본 응답에서 제외하고 ?withPolylines=1 일 때만 포함한다.
 // ============================================================
 app.get('/api/dashboard', async (req, res) => {
+  const withPolylines = req.query.withPolylines === '1';
   const db = await loadDB();
   const settings = getSettings(db);
   calculatePenalties(db, settings);
@@ -542,7 +545,20 @@ app.get('/api/dashboard', async (req, res) => {
   const members = db.members.map(member => {
     const activities = db.activities
       .filter(a => a.strava_id === member.strava_id && isRun(a))
-      .sort((a, b) => b.start_date_local.localeCompare(a.start_date_local));
+      .sort((a, b) => b.start_date_local.localeCompare(a.start_date_local))
+      .map(a => withPolylines ? a : ({
+        strava_id: a.strava_id,
+        activity_id: a.activity_id,
+        name: a.name,
+        distance: a.distance,
+        moving_time: a.moving_time,
+        start_date: a.start_date,
+        start_date_local: a.start_date_local,
+        type: a.type,
+        sport_type: a.sport_type,
+        start_latlng: a.start_latlng || null
+        // summary_polyline 의도적으로 제외 (지도 탭에서만 lazy load)
+      }));
     const penalties = (db.penalties || [])
       .filter(p => p.strava_id === member.strava_id)
       .sort((a, b) => b.week_start.localeCompare(a.week_start));
@@ -551,7 +567,7 @@ app.get('/api/dashboard', async (req, res) => {
     return {
       id: member.id, strava_id: member.strava_id, name: member.name,
       profile: member.profile, connected: !!member.access_token,
-      activities, allRuns: activities, penalties, totalPenalty, monthlyKm
+      activities, penalties, totalPenalty, monthlyKm
     };
   });
 
@@ -1021,3 +1037,28 @@ app.get('/api/marathon-detail', async (req, res) => {
 });
 
 module.exports = app;
+
+// test
+('대회명'),
+      representative: extract('대표자명'),
+      email: extract('E-mail'),
+      datetime: extract('대회일시'),
+      phone: extract('전화번호'),
+      categories: extract('대회종목'),
+      region: extract('대회지역'),
+      place: extract('대회장소'),
+      organizer: extract('주최단체'),
+      registrationPeriod: extract('접수기간'),
+      homepage,
+      description,
+      address,
+      lat, lng
+    });
+  } catch (err) {
+    console.error('Marathon detail error:', err.message);
+    res.status(500).json({ error: '상세 정보를 불러올 수 없습니다' });
+  }
+});
+
+module.exports = app;
+odule.exports = app;

@@ -1070,7 +1070,9 @@
 
     async function fetchDashboard() {
       try {
-        const res = await fetch('/api/dashboard');
+        // polyline이 이미 로드된 상태(지도 탭 사용 중)면 후속 새로고침에서도 유지
+        const url = _polylinesLoaded ? '/api/dashboard?withPolylines=1' : '/api/dashboard';
+        const res = await fetch(url);
         dashboardData = await res.json();
       } catch (e) { console.error('Dashboard fetch error:', e); }
     }
@@ -2145,10 +2147,45 @@
       }
     }
 
-    function renderMap() {
+    // 지도 탭은 polyline이 필요. 기본 dashboard 응답에는 polyline이 빠져 있으므로
+    // 처음 진입 시 1회 lazy fetch한다.
+    let _polylinesLoaded = false;
+    let _polylineLoadingPromise = null;
+    async function ensurePolylines() {
+      if (_polylinesLoaded) return;
+      if (_polylineLoadingPromise) return _polylineLoadingPromise;
+      _polylineLoadingPromise = (async () => {
+        try {
+          const res = await fetch('/api/dashboard?withPolylines=1');
+          const fullData = await res.json();
+          if (fullData && Array.isArray(fullData.members)) {
+            dashboardData = fullData;
+            _polylinesLoaded = true;
+          }
+        } catch (e) {
+          console.error('Polyline load error:', e);
+        } finally {
+          _polylineLoadingPromise = null;
+        }
+      })();
+      return _polylineLoadingPromise;
+    }
+
+    async function renderMap() {
       if (!dashboardData?.members.length) {
         document.getElementById('content').innerHTML = '<div class="empty-state"><h3>참가자가 없어요</h3></div>';
         return;
+      }
+
+      // polyline 미로드 시 1회 lazy fetch (지도 탭 첫 진입에만 발생)
+      if (!_polylinesLoaded) {
+        document.getElementById('content').innerHTML = `
+          <div class="empty-state">
+            <h3>경로 불러오는 중...</h3>
+            <p>잠시만 기다려주세요</p>
+          </div>`;
+        await ensurePolylines();
+        if (currentTab !== 'map') return; // 사용자가 탭을 다시 바꿨으면 중단
       }
 
       const { members } = dashboardData;
