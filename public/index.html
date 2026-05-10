@@ -1197,8 +1197,6 @@
       const { members, settings } = dashboardData;
       const now = new Date();
       const weekStartStr = getCurrentWeekStart(now);
-      const me = getMyInfo();
-      const myStravaId = me?.sid ? String(me.sid) : null;
 
       // ★ 이번 달 km 기준으로 정렬 (내림차순)
       const sorted = [...members].sort((a, b) => (b.monthlyKm || 0) - (a.monthlyKm || 0));
@@ -1228,14 +1226,14 @@
         const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
         const cal = buildMiniCalendar(m, now.getFullYear(), now.getMonth());
 
-        const isMine = myStravaId && String(m.strava_id) === myStravaId;
-        const exemptActions = isMine ? `
+        // 부상면제 버튼은 모든 멤버 카드에 노출 (크루 내부 운영용 — 누구든 신청 가능)
+        const exemptActions = `
               <div class="exempt-action-row">
                 ${isExempted
                   ? `<button class="btn-exempt" onclick="event.stopPropagation();showExemptionDetail(${m.strava_id}, '${weekStartStr}')">🩹 이번 주 부상면제 보기/취소</button>`
                   : `<button class="btn-exempt" onclick="event.stopPropagation();openExemptionRequest(${m.strava_id})">🩹 부상면제 신청</button>`
                 }
-              </div>` : '';
+              </div>`;
 
         html += `
           <div class="member-card" id="card-${i}">
@@ -1453,14 +1451,13 @@
       });
     }
 
-    // 신청 가능 주차 목록 (이번 주차 포함, 과거~현재만)
-    function getEligibleWeeks() {
+    // 신청 가능 주차 목록 (대상 멤버의 주차 기준)
+    function getEligibleWeeks(stravaId) {
       if (!dashboardData || !dashboardData.members.length) return [];
+      const target = dashboardData.members.find(m => String(m.strava_id) === String(stravaId));
+      if (!target) return [];
       const all = new Set();
-      const me = getMyInfo();
-      const myMember = dashboardData.members.find(m => String(m.strava_id) === String(me?.sid));
-      if (!myMember) return [];
-      myMember.penalties.forEach(p => all.add(p.week_start + '|' + p.week_end));
+      target.penalties.forEach(p => all.add(p.week_start + '|' + p.week_end));
       return [...all].sort().reverse().map(s => {
         const [start, end] = s.split('|');
         return { start, end };
@@ -1468,26 +1465,32 @@
     }
 
     function openExemptionRequest(stravaId) {
-      const me = getMyInfo();
-      if (!me || !me.sid) {
-        showToast('먼저 Strava 연결이 필요합니다', 'error'); return;
-      }
-      if (String(me.sid) !== String(stravaId)) {
-        showToast('본인 계정만 신청할 수 있습니다', 'error'); return;
-      }
-      const weeks = getEligibleWeeks();
+      const member = dashboardData?.members.find(m => String(m.strava_id) === String(stravaId));
+      if (!member) { showToast('멤버 정보를 찾을 수 없습니다', 'error'); return; }
+
+      const weeks = getEligibleWeeks(stravaId);
       if (!weeks.length) { showToast('신청 가능한 주차가 없습니다', 'error'); return; }
       const currentWs = getCurrentWeekStart(new Date());
 
-      const optionsHtml = weeks.map(w => {
-        const label = `${w.start.slice(5).replace('-','/')} ~ ${w.end.slice(5).replace('-','/')}`;
-        const isCur = w.start === currentWs ? ' (이번 주)' : '';
-        const sel = w.start === currentWs ? ' selected' : '';
-        return `<option value="${w.start}"${sel}>${label}${isCur}</option>`;
-      }).join('');
+      // 이미 면제된 주차는 제외 (면제 갱신 원하면 상세보기에서 취소 후 재신청)
+      const exemptedWeeks = new Set(
+        member.penalties.filter(p => p.exempted).map(p => p.week_start)
+      );
+      const optionsHtml = weeks
+        .filter(w => !exemptedWeeks.has(w.start))
+        .map(w => {
+          const label = `${w.start.slice(5).replace('-','/')} ~ ${w.end.slice(5).replace('-','/')}`;
+          const isCur = w.start === currentWs ? ' (이번 주)' : '';
+          const sel = w.start === currentWs ? ' selected' : '';
+          return `<option value="${w.start}"${sel}>${label}${isCur}</option>`;
+        }).join('');
+
+      if (!optionsHtml) {
+        showToast('이미 모든 주차가 면제 처리되어 있습니다', 'error'); return;
+      }
 
       openExemptModal(`
-        <div class="modal-title">🩹 부상면제 신청</div>
+        <div class="modal-title">🩹 ${member.name} - 부상면제 신청</div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
           이미지(진단서/처방전/병원 영수증 등)와 사유를 함께 제출해주세요.<br>
           신청 즉시 해당 주차 상태가 <strong style="color:#60A5FA">부상면제</strong>로 바뀌며 벌금에서 제외됩니다.
@@ -1579,8 +1582,6 @@
       if (!p || !p.exempted) {
         showToast('부상면제 정보가 없습니다', 'error'); return;
       }
-      const me = getMyInfo();
-      const isMine = me && String(me.sid) === String(stravaId);
       const weekLabel = `${weekStart.slice(5).replace('-','/')} ~ ${(p.week_end || '').slice(5).replace('-','/')}`;
       const created = p.exemption_created_at ? new Date(p.exemption_created_at).toLocaleString('ko-KR') : '';
       const imgUrl = `/api/exemption-image?strava_id=${stravaId}&week_start=${encodeURIComponent(weekStart)}&t=${Date.now()}`;
@@ -1601,7 +1602,7 @@
         <div style="display:none;color:var(--danger);font-size:13px;text-align:center;padding:20px">이미지를 불러올 수 없습니다</div>
         <div class="modal-btn-row">
           <button class="modal-btn modal-btn-secondary" onclick="closeExemptModal()">닫기</button>
-          ${isMine ? `<button class="modal-btn modal-btn-danger" onclick="cancelExemption(${stravaId}, '${weekStart}')">면제 취소</button>` : ''}
+          <button class="modal-btn modal-btn-danger" onclick="cancelExemption(${stravaId}, '${weekStart}')">면제 취소</button>
         </div>
       `);
     }
